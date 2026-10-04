@@ -12,7 +12,12 @@ ALLOWED_ORIGINS = {
     "http://localhost:5173",
     "http://127.0.0.1:5500",
     "http://localhost:5500",
+    "https://arnavshergill.github.io",
 }
+ALLOWED_ORIGINS.update(
+    origin.strip() for origin in os.environ.get("LIFEMAP_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+)
 MAX_REQUEST_BYTES = 64 * 1024
 
 
@@ -89,8 +94,9 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     host = os.environ.get("LIFEMAP_API_HOST", "127.0.0.1")
-    server = ThreadingHTTPServer((host, 8000), LifeMapAPIHandler)
-    print(f"LifeMap API listening at http://{host}:8000")
+    port = int(os.environ.get("PORT", os.environ.get("LIFEMAP_API_PORT", "8000")))
+    server = ThreadingHTTPServer((host, port), LifeMapAPIHandler)
+    print(f"LifeMap API listening at http://{host}:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -4,9 +4,15 @@ import {validateProfile} from '../types/contracts.js';
 import {mockConversation} from '../data/mockConversation.js';
 export const intakeQuestions = mockConversation.questions;
 const delay = () => new Promise(resolve=>setTimeout(resolve,350));
-const API_URL = 'http://127.0.0.1:8000/api/chat';
-const isHostedDemo = typeof window !== 'undefined' &&
+const isHostedSite = typeof window !== 'undefined' &&
  !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+const configuredApiUrl = typeof window !== 'undefined' ? window.LIFEMAP_CONFIG?.chatApiUrl?.trim() : '';
+const API_URL = configuredApiUrl || (isHostedSite ? '' : 'http://127.0.0.1:8000/api/chat');
+
+function hostedDemoReply(message) {
+ return fallbackReply(message).replace(/because the local Ollama service is unavailable(?: right now)?/, 'on this hosted website')
+  .replace('and starting Ollama with the gemma3:latest model will restore live answers.', 'with illustrative answers rather than live AI.');
+}
 
 const FALLBACK_PATTERNS = [
  /Could not reach Ollama/i,
@@ -39,9 +45,9 @@ function fallbackReply(message='') {
 
 export async function askLifeMap(message,conversation=[]) {
  if(!message.trim()) throw new Error('Please add a message before sending.');
- if(isHostedDemo) {
-  return fallbackReply(message).replace(/because the local Ollama service is unavailable(?: right now)?/, 'on this hosted website')
-   .replace('and starting Ollama with the gemma3:latest model will restore live answers.', 'with illustrative answers rather than live AI.');
+ if(!API_URL) return hostedDemoReply(message);
+ if(isHostedSite && !API_URL.startsWith('https://')) {
+  throw new Error('The hosted LifeMap chat backend must use an HTTPS URL.');
  }
  let response;
  try {
@@ -57,6 +63,7 @@ export async function askLifeMap(message,conversation=[]) {
    })
   });
  } catch(error) {
+  if(isHostedSite) throw new Error('Could not reach the LifeMap AI backend. Please try again later.');
   return fallbackReply(message);
  }
  let payload;
@@ -68,6 +75,7 @@ export async function askLifeMap(message,conversation=[]) {
  }
  const errorText = payload.error || '';
  if(!response.ok) {
+  if(isHostedSite) throw new Error('The LifeMap AI backend is unavailable. Please try again later.');
   if(isFallbackError(errorText) || isFallbackError(`HTTP ${response.status}`)) {
    return fallbackReply(message);
   }

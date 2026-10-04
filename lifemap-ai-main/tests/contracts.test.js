@@ -69,3 +69,22 @@ test('hosted demo answers without requesting a visitor local API',async()=>{
   delete globalThis.window;
  }
 });
+test('configured hosted backend returns live chat and surfaces connection failures',async()=>{
+ const originalFetch=globalThis.fetch;
+ globalThis.window={location:{hostname:'arnavshergill.github.io'},LIFEMAP_CONFIG:{chatApiUrl:'https://api.example.com/api/chat'}};
+ globalThis.fetch=async(url)=>{
+  assert.equal(url,'https://api.example.com/api/chat');
+  return {ok:true,json:async()=>({reply:'Live answer'})};
+ };
+ try{
+  const hosted=await import('../src/services/planService.js?configured-hosted-test');
+  assert.equal(await hosted.askLifeMap('Hello'),'Live answer');
+  globalThis.fetch=async()=>{throw new TypeError('fetch failed');};
+  await assert.rejects(hosted.askLifeMap('Hello'),/Could not reach the LifeMap AI backend/);
+  globalThis.fetch=async()=>({ok:false,status:502,json:async()=>({error:'Could not reach Ollama'})});
+  await assert.rejects(hosted.askLifeMap('Hello'),/backend is unavailable/);
+ }finally{
+  globalThis.fetch=originalFetch;
+  delete globalThis.window;
+ }
+});
