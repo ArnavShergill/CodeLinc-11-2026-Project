@@ -83,6 +83,10 @@ def clean_context(value):
         result["result"] = {}
         if calculation.get("calculator") == "team-reference":
             result["result"]["calculator"] = "team-reference"
+        assumptions = calculation.get("assumptions", [])
+        if not isinstance(assumptions,list) or len(assumptions)>20 or any(not isinstance(text,str) or len(text)>1000 for text in assumptions):
+            raise ValueError("Invalid calculator assumptions.")
+        result["result"]["assumptions"] = assumptions
         for key in ("immediateNeeds", "longTermNeeds", "totalNeeds", "availableResources", "additionalCoverageNeeded"):
             item = calculation.get(key)
             if isinstance(item, bool) or not isinstance(item, (int, float)) or not math.isfinite(item) or item < 0:

@@ -73,7 +73,7 @@ export async function generateLesson(topic,context={}){
  if(!lesson||['title','explanation','example','question','why'].some(key=>typeof lesson[key]!=='string')||!Array.isArray(lesson.choices)||lesson.choices.length!==3||lesson.choices.some(choice=>typeof choice!=='string')||!Number.isInteger(lesson.correctIndex)||lesson.correctIndex<0||lesson.correctIndex>2)throw Error('The tutor returned an invalid lesson. Please retry.');
  return lesson;
 }
-export async function explainPlan(result,profile,source='mock'){
+export async function explainPlan(result,profile,source='mock',details={}){
  if(source==='mock')return 'This is a fixed sample result used to preview the experience. It is not calculated from your information. Your team is connecting the Lincoln calculators; your personal estimate will be available after that integration.';
- return askLifeMap('Explain the provided calculator result in plain language. Use its numbers exactly and describe the main contributors. Do not recalculate anything.',[],{profile,result,resultSource:source});
+ return askLifeMap('Explain the provided calculator result in plain language. Use its numbers exactly and describe the main contributors. Do not recalculate anything.',[],{...details,profile,result,resultSource:source});
 }

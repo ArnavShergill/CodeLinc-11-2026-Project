@@ -120,6 +120,7 @@ def API_request(message: str, conversation: Optional[List[dict]] = None, context
             "Never calculate coverage, invent missing facts, or change calculator numbers. "
             "A result marked mock is a fixed example unrelated to this person's inputs. "
             "A result with calculator=team-reference uses the team's reference calculator, not Lincoln's proprietary formula. "
+            "It is still personalized to the supplied inputs when profileSource is confirmed; do not confuse it with a fixed mock result. "
             "Explain that limitation when discussing it; do not call it their personal estimate. "
             "Ask one focused follow-up question when useful."
         )})
