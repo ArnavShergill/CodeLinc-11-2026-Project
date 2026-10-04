@@ -1,32 +1,73 @@
-// Optional QA helper: point PLAYWRIGHT_MODULE_PATH at an installed Playwright package.
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+// Run with PLAYWRIGHT_MODULE_PATH if Playwright is installed outside this project.
+// QA_STATIC_ROOT serves the local app at the production Pages origin for browser QA.
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+const path=require('path');
+const assert=require('assert/strict');
 (async()=>{
  const browser=await chromium.launch({channel:'chrome',headless:true});
- try {
- const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
- page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
- const shot=async name=>{await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(250);await page.screenshot({path:`artifacts/${name}.png`,fullPage:true});};
- const go=async route=>{await page.evaluate(r=>{location.hash=r},route);await page.waitForTimeout(250);};
- await page.goto('http://127.0.0.1:5173');await shot('landing-desktop');
- for(const name of ['How It Works','FAQ','See How It Works']){await page.getByRole('button',{name,exact:true}).click();await page.getByRole('button',{name:'Got it'}).click();}
- await page.getByRole('link',{name:'Features',exact:true}).click();await page.locator('#features').waitFor();
- await page.getByRole('link',{name:'Log In',exact:true}).click();await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Got it'}).click();await page.getByRole('button',{name:'Open Amos profile'}).click();await page.getByRole('button',{name:'Got it'}).click();
- await page.getByRole('link',{name:'Log Out',exact:true}).click();await page.locator('.nav-actions').getByRole('link',{name:'Get Started',exact:true}).click();await shot('welcome-desktop');
- await page.getByRole('link',{name:'Learn',exact:true}).click();await page.locator('details').first().locator('summary').click();await page.getByRole('button',{name:'Ask a Question',exact:true}).click();await page.locator('#advisor-question').fill('How do policies work?');await page.getByRole('button',{name:'Send question'}).click();await page.getByText('How do policies work?',{exact:true}).waitFor();
- await go('home');await page.locator('#home-question').fill('What does coverage mean?');await page.getByRole('button',{name:'Ask LifeMap',exact:true}).click();await page.getByText('What does coverage mean?',{exact:true}).waitFor();
- await go('home');await page.getByRole('link',{name:'Start My Plan',exact:true}).click();await shot('conversation-desktop');
- await page.locator('#message').fill('My annual income is $75,000');await page.getByRole('button',{name:'Send message'}).click();await page.waitForTimeout(450);
- for(let i=0;i<3;i++){await page.getByRole('button',{name:/Use example:/}).click();await page.waitForTimeout(450)}
- await page.getByRole('link',{name:'Review My Information',exact:true}).click();await shot('review-desktop');
- await page.locator('[data-edit="annualIncome"]').click();await page.locator('#annualIncome').fill('82000');await page.locator('[data-edit="annualIncome"]').click();await page.getByText('$82,000',{exact:true}).waitFor();
- await page.locator('.advanced-profile summary').click();await page.locator('[data-edit="childrenAges"]').click();await page.locator('#childrenAges').fill('7, invalid');await page.getByRole('button',{name:'Calculate My Plan',exact:true}).click();await page.getByRole('alert').filter({hasText:'Children’s ages'}).waitFor();await page.locator('#childrenAges').fill('7, 11');
- await page.getByRole('button',{name:'Calculate My Plan',exact:true}).click();await page.getByText('$650,000',{exact:true}).waitFor();await page.waitForTimeout(450);await shot('results-desktop');
- await page.getByRole('link',{name:'See Full Breakdown',exact:true}).click();await page.getByText('$800,000',{exact:true}).waitFor();await shot('breakdown-desktop');await page.getByRole('link',{name:'Try a life scenario'}).click();
- await page.locator('[data-point="1"] > circle').first().hover();if(!await page.locator('[data-point="1"] .chart-tooltip').isVisible())throw Error('Tooltip not visible');await shot('simulator-desktop');await page.locator('[data-point="1"] > circle').first().click();await page.locator('[data-point="1"]').focus();await page.keyboard.press('Enter');
- for(const [name,value] of [['Have a child','$730,000'],['Buy a home','$820,000'],['Increase income','$750,000'],['Pay off loans','$625,000'],['Get married','$700,000']]){await page.getByRole('button',{name,exact:true}).click();await page.locator('.scenario-comparison strong').filter({hasText:value}).waitFor();}
- await page.getByRole('button',{name:'Reset scenario'}).click();await go('learn');await page.getByRole('button',{name:'Learn the Basics'}).click();await shot('learn-desktop');
- for(const viewport of [{width:1440,height:1000},{width:768,height:1024},{width:390,height:844}]){await page.setViewportSize(viewport);for(const route of ['landing','home','intake','review','results','breakdown','simulator','learn']){await go(route);if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow '+route+' at '+viewport.width);if(viewport.width===390)await shot(route+'-mobile');}}
- await go('home');await page.getByRole('button',{name:'Toggle navigation'}).click();await page.getByRole('link',{name:'Ask LifeMap',exact:true}).click();await page.getByRole('button',{name:'Ask a Question'}).click();await page.getByRole('button',{name:'What is life insurance?',exact:true}).click();await shot('ask-mobile');
- console.log(JSON.stringify({journey:'passed',routes:'8 at desktop/tablet/mobile',mainButtons:'passed',scenarioButtons:5,chartTooltip:'passed',errors},null,2));if(errors.length)process.exitCode=1;
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  if(process.env.QA_STATIC_ROOT)await page.route('https://arnavshergill.github.io/**',route=>{
+   const relative=new URL(route.request().url()).pathname.replace('/CodeLinc-11-2026-Project/','')||'index.html';
+   return route.fulfill({path:path.join(process.env.QA_STATIC_ROOT,relative)});
+  });
+  let failNext=false,intakeCalls=0,advisorCalls=0,lastAdvisor;
+  await page.route('**/api/intake',async route=>{
+   intakeCalls++;const body=route.request().postDataJSON();assert.equal(body.consent,true);
+   if(failNext){failNext=false;return route.fulfill({status:502,json:{error:'Unavailable'}});}
+   const updates=body.message.includes('correction')?{annualIncome:95000}:body.field==='annualIncome'?{annualIncome:90000,numberOfDependents:2}:{spouseAnnualIncome:45000};
+   return route.fulfill({json:{reply:'Please confirm these details.',updates}});
+  });
+  await page.route('**/api/chat',async route=>{
+   advisorCalls++;lastAdvisor=route.request().postDataJSON();assert.equal(lastAdvisor.consent,true);
+   return route.fulfill({json:{reply:'Your confirmed annual income is '+lastAdvisor.context.profile.annualIncome+'. Calculations are still examples.'}});
+  });
+  await page.goto(process.env.QA_BASE_URL||(process.env.QA_STATIC_ROOT?'https://arnavshergill.github.io/CodeLinc-11-2026-Project/':'http://127.0.0.1:5173'));
+  const go=async route=>{await page.evaluate(r=>location.hash=r,route);await page.waitForTimeout(150);};
+  await go('intake');
+  await page.locator('#message').fill('I earn 90k and support two people');
+  await page.getByRole('button',{name:'Send message'}).click();
+  await page.getByRole('alert').filter({hasText:'privacy'}).waitFor();assert.equal(intakeCalls,0);
+  await page.locator('[data-action="consent"]').check();
+  await page.getByRole('button',{name:'Send message'}).click();
+  await page.getByRole('button',{name:'Confirm details'}).waitFor();
+  assert.equal(await page.locator('.captured-row').count(),0);
+  await page.getByRole('button',{name:'Confirm details'}).click();
+  await page.locator('.captured').getByText('$90,000',{exact:true}).waitFor();
+  assert.equal(await page.locator('.captured-row').count(),2);
+  await page.locator('#message').fill('correction: annual income is 95k');
+  await page.getByRole('button',{name:'Send message'}).click();
+  await page.getByRole('button',{name:'Let me correct that'}).click();
+  await page.locator('.captured').getByText('$90,000',{exact:true}).waitFor();
+  await page.locator('#message').fill('correction: annual income is 95k');
+  await page.getByRole('button',{name:'Send message'}).click();
+  await page.getByRole('button',{name:'Confirm details'}).click();
+  await page.locator('.captured').getByText('$95,000',{exact:true}).waitFor();
+  failNext=true;await page.locator('#message').fill('45000');await page.getByRole('button',{name:'Send message'}).click();
+  await page.getByRole('button',{name:'Retry message'}).waitFor();
+  const turns=await page.locator('.message.customer').count();
+  await page.getByRole('button',{name:'Retry message'}).click();await page.getByRole('button',{name:'Confirm details'}).click();
+  assert.equal(await page.locator('.message.customer').count(),turns);
+  await go('learn');await page.getByRole('button',{name:'Ask a Question',exact:true}).click();
+  await page.locator('#advisor-question').fill('What information do you have?');await page.getByRole('button',{name:'Send question'}).click();
+  await page.getByText('Your confirmed annual income is 95000. Calculations are still examples.',{exact:true}).waitFor();
+  assert.equal(lastAdvisor.context.profile.annualIncome,95000);
+  await go('review');assert.equal(await page.locator('#annualIncome').inputValue(),'95000');
+  await go('intake');await page.getByRole('button',{name:'Use a complete sample profile instead'}).click();
+  await page.getByRole('link',{name:'Review My Information',exact:true}).click();
+  await page.getByRole('button',{name:'Calculate My Plan'}).click();await page.getByText('Sample Coverage Amount',{exact:true}).waitFor();
+  await page.getByText('This is a fixed sample result used to preview the experience.',{exact:false}).waitFor();
+  for(const viewport of [{width:1440,height:1000},{width:768,height:1024},{width:390,height:844}]){
+   await page.setViewportSize(viewport);
+   for(const route of ['landing','home','intake','review','results','breakdown','simulator','learn']){
+    await go(route);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Overflow '+route+' at '+viewport.width);
+   }
+  }
+  await go('intake');await page.getByRole('button',{name:'Clear my details and conversation'}).click();
+  assert.equal(await page.locator('.captured-row').count(),0);assert.equal(await page.locator('.message.customer').count(),0);
+  assert.equal(await page.locator('[data-action="consent"]').isChecked(),false);
+  assert.deepEqual(errors,[]);
+  console.log(JSON.stringify({confirmation:'passed',corrections:'passed',retry:'passed',privacy:'passed',context:'passed',sampleLabels:'passed',routes:'8 at desktop/tablet/mobile',intakeCalls,advisorCalls,errors},null,2));
  }finally{await browser.close();}
-})().catch(e=>{console.error(e);process.exitCode=1});
+})().catch(error=>{console.error(error);process.exitCode=1});

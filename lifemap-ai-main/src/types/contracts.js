@@ -39,6 +39,6 @@ export function validateProfile(profile) {
  return profileFields.flatMap(([key,label,type]) => {
   const value = profile[key];
   if(type==='ages') return Array.isArray(value) && value.every(n=>Number.isInteger(n)&&n>=0&&n<=120) ? [] : [label];
-  return typeof value==='number' && Number.isFinite(value) && value>=0 && (type!=='count'||Number.isInteger(value)) && (type!=='rate'||value<=1) ? [] : [label];
+  return typeof value==='number' && Number.isFinite(value) && value>=0 && (type!=='count'||(Number.isInteger(value)&&value<=120)) && (type!=='rate'||value<=1) ? [] : [label];
  });
 }

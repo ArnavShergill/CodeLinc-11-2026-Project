@@ -1,107 +1,72 @@
-import {mockProfile} from '../data/mockProfile.js';
 import {mockResult} from '../data/mockResult.js';
 import {validateProfile} from '../types/contracts.js';
 import {mockConversation} from '../data/mockConversation.js';
 export const intakeQuestions = mockConversation.questions;
-const delay = () => new Promise(resolve=>setTimeout(resolve,350));
-const isHostedSite = typeof window !== 'undefined' &&
- !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
-const configuredApiUrl = typeof window !== 'undefined' ? window.LIFEMAP_CONFIG?.chatApiUrl?.trim() : '';
-const API_URL = configuredApiUrl || (isHostedSite ? '' : 'http://127.0.0.1:8000/api/chat');
-
-function hostedDemoReply(message) {
- return fallbackReply(message).replace(/because the local Ollama service is unavailable(?: right now)?/, 'on this hosted website')
-  .replace('and starting Ollama with the gemma3:latest model will restore live answers.', 'with illustrative answers rather than live AI.');
-}
-
-const FALLBACK_PATTERNS = [
- /Could not reach Ollama/i,
- /Start Ollama/i,
- /gemma3:latest/i,
- /fetch failed/i,
- /ERR_CONNECTION_REFUSED/i,
- /ECONNREFUSED/i,
- /HTTP 502/i,
- /HTTP 503/i,
- /local Ollama model/i,
- /The Ollama Python package is not installed/i
-];
-
-function isFallbackError(message='') {
- return FALLBACK_PATTERNS.some(pattern => pattern.test(message));
-}
-
-function fallbackReply(message='') {
- const cleaned = String(message || '').trim().replace(/\s+/g,' ');
- const lower = cleaned.toLowerCase();
- if(/income|salary|earn|pay/.test(lower)) {
-  return 'I\'m in demo mode because the local Ollama service is unavailable. For this sample, the plan assumes a $75,000 annual income and a family-focused protection need.';
+const config=typeof window!=='undefined'?window.LIFEMAP_CONFIG||{}:{};
+const hosted=typeof window!=='undefined'&&!['localhost','127.0.0.1','[::1]'].includes(window.location.hostname);
+const chatUrl=config.chatApiUrl?.trim()||(hosted?'':'http://127.0.0.1:8000/api/chat');
+const intakeUrl=chatUrl?new URL('intake',chatUrl).href:'';
+export const calculatorConnected=Boolean(config.calculateApiUrl);
+export const scenarioConnected=Boolean(config.scenarioApiUrl);
+export const emptyProfile=()=>Object.fromEntries(intakeQuestions.map(([key])=>[key,null]));
+export function nextQuestionIndex(profile){return intakeQuestions.findIndex(([key])=>profile[key]==null);}
+function validUpdates(updates){
+ if(!updates||typeof updates!=='object'||Array.isArray(updates))throw Error('The AI returned invalid profile details.');
+ const valid={};
+ for(const [key,value] of Object.entries(updates)){
+  if(!intakeQuestions.some(([field])=>field===key)||value==null)continue;
+  const partial={...Object.fromEntries(intakeQuestions.map(([field])=>[field,field==='childrenAges'?[]:0])),[key]:value};
+  if(validateProfile(partial).length)throw Error('The AI returned invalid details. Please rephrase your answer.');
+  valid[key]=value;
  }
- if(/depend|children|family|mortgage|home/.test(lower)) {
-  return 'I\'m in demo mode because the local Ollama service is unavailable. This example still reflects a married household with two children and a mortgage alongside other family protection needs.';
- }
- return 'I\'m in demo mode because the local Ollama service is unavailable right now. The app is still running with its sample profile, and starting Ollama with the gemma3:latest model will restore live answers.';
+ return valid;
 }
-
-export async function askLifeMap(message,conversation=[]) {
- if(!message.trim()) throw new Error('Please add a message before sending.');
- if(!API_URL) return hostedDemoReply(message);
- if(isHostedSite && !API_URL.startsWith('https://')) {
-  throw new Error('The hosted LifeMap chat backend must use an HTTPS URL.');
- }
+async function post(url,body){
+ if(!url)throw Error('Live AI is not connected. You can review your details or use the sample profile.');
+ if(hosted&&!url.startsWith('https://'))throw Error('The hosted LifeMap backend must use HTTPS.');
  let response;
- try {
-  response=await fetch(API_URL,{
-   method:'POST',
-   headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({
-    message,
-    conversation:conversation.map(turn=>({
-     role:turn.role==='customer'?'user':turn.role,
-     content:turn.text
-    }))
-   })
-  });
- } catch(error) {
-  if(isHostedSite) throw new Error('Could not reach the LifeMap AI backend. Please try again later.');
-  return fallbackReply(message);
- }
+ try{response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(100000)});}
+ catch(error){throw Error(error.name==='TimeoutError'?'The request timed out. Your message is saved; please retry.':'Could not reach the LifeMap AI backend. Your message is saved; please retry.');}
  let payload;
- try {
-  payload=await response.json();
- } catch {
-  if(!response.ok) return fallbackReply(message);
-  throw new Error('The LifeMap API returned an invalid response.');
- }
- const errorText = payload.error || '';
- if(!response.ok) {
-  if(isHostedSite) throw new Error('The LifeMap AI backend is unavailable. Please try again later.');
-  if(isFallbackError(errorText) || isFallbackError(`HTTP ${response.status}`)) {
-   return fallbackReply(message);
-  }
-  throw new Error(errorText || `The LifeMap API returned HTTP ${response.status}.`);
- }
- if(typeof payload.reply!=='string'||!payload.reply.trim()) {
-  throw new Error('The LifeMap API returned an empty reply.');
- }
+ try{payload=await response.json();}catch{throw Error('The backend returned an invalid response. Please retry.');}
+ if(!response.ok)throw Error(response.status===429?'Too many requests. Please wait a minute and retry.':response.status===400?(payload.error||'Please check your information.'):'The LifeMap AI backend is unavailable. Please retry.');
+ return payload;
+}
+function requestBody(message,conversation,context){
+ if(typeof message!=='string'||!message.trim()||message.length>2000)throw Error('Please send between 1 and 2,000 characters.');
+ if(!context.consent)throw Error('Please accept the chat privacy notice before sending.');
+ const {consent,...details}=context;
+ return {message,consent:true,context:details,conversation:conversation.slice(-20).map(turn=>({role:turn.role==='customer'?'user':turn.role,content:turn.text}))};
+}
+export async function askLifeMap(message,conversation=[],context={}){
+ const payload=await post(chatUrl,requestBody(message,conversation,context));
+ if(typeof payload.reply!=='string'||!payload.reply.trim())throw Error('The AI returned an empty answer. Please retry.');
  return payload.reply;
 }
-
-// The reply is live AI; intake profile changes remain clearly synthetic demo values.
-export async function sendIntakeMessage({profile,questionIndex,message,conversation=[]}) {
- const reply=await askLifeMap(message,conversation);
- const [field] = intakeQuestions[questionIndex];
- return {profile:{...profile,[field]:mockProfile[field]},reply,source:'live-ai',profileSource:'mock'};
+export async function sendIntakeMessage({profile,questionIndex,message,conversation=[],consent=false}){
+ const field=intakeQuestions[questionIndex]?.[0]||null;
+ const payload=await post(intakeUrl,{...requestBody(message,conversation,{profile,consent}),field});
+ if(typeof payload.reply!=='string')throw Error('The AI returned an invalid answer. Please retry.');
+ return {updates:validUpdates(payload.updates),reply:payload.reply};
 }
-// Backend integration: replace with POST LifeNeedsProfile -> LifeNeedsResult.
-export async function calculatePlan(profile) {
- const missing = validateProfile(profile);
- if(missing.length) throw new Error(`Please review: ${missing.join(', ')}.`);
- await delay();
+export function validateResult(result){
+ if(!result||['immediateNeeds','longTermNeeds','totalNeeds','availableResources','additionalCoverageNeeded'].some(key=>typeof result[key]!=='number'||!Number.isFinite(result[key])||result[key]<0)
+ ||!Array.isArray(result.breakdown)||result.breakdown.some(item=>typeof item.label!=='string'||typeof item.amount!=='number'||!Number.isFinite(item.amount)||item.amount<0)
+ ||!Array.isArray(result.assumptions)||result.assumptions.some(item=>typeof item!=='string'))throw Error('The calculator returned an invalid result.');
+ return result;
+}
+export async function calculatePlan(profile){
+ const missing=validateProfile(profile);
+ if(missing.length)throw Error(`Please review: ${missing.join(', ')}.`);
+ if(config.calculateApiUrl){const payload=await post(config.calculateApiUrl,{profile});return {result:validateResult(payload.result),source:'backend'};}
  return {result:structuredClone(mockResult),source:'mock'};
 }
-// AI explanation integration: verified LifeNeedsResult -> explanation; do not change numbers.
-export async function explainPlan(result) {
- await delay();
- return `The illustrative ${new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(result.additionalCoverageNeeded)} result includes income support, outstanding debts, and education needs, with available resources shown separately. This fixed demo estimate does not change when you edit your information.`;
+export async function calculateScenario(profile,scenario,changes){
+ if(!config.scenarioApiUrl)throw Error('Live scenarios are waiting for the calculator integration.');
+ const payload=await post(config.scenarioApiUrl,{profile,scenario,changes});
+ return {result:validateResult(payload.result),source:'backend'};
+}
+export async function explainPlan(result,profile,source='mock',consent=false){
+ if(source==='mock')return 'This is a fixed sample result used to preview the experience. It is not calculated from your information. Your team is connecting the Lincoln calculators; your personal estimate will be available after that integration.';
+ return askLifeMap('Explain the provided calculator result in plain language. Use its numbers exactly and describe the main contributors. Do not recalculate anything.',[],{profile,result,resultSource:source,consent});
 }
