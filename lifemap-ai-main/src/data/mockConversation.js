@@ -1,5 +1,5 @@
 export const mockConversation={
- introduction:'Let’s build your protection profile. Share only what you’re comfortable sending to the AI service; rounded amounts are fine. I’ll ask one question at a time and confirm what I understood.',
+ introduction:'Thank you for visiting LifeMap. Let’s build your profile together, at your own pace. We’ll start with one simple question and take it step by step. Rounded amounts are fine. I’ll confirm what I understood before we move on.',
  complete:'Your profile is ready to review. You can still send corrections or edit any field in Review.',
  questions:[
  ['annualIncome','What is your annual income before taxes?','$75,000'],

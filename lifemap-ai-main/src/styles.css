@@ -91,3 +91,56 @@
 .welcome-card.build {background:#f7f8f6;border:1px solid #e0e4dd;}
 .welcome-card.build .feature-icon {background:#e9eeeb;color:#4f6760;}
 .welcome-card.build .secondary {background:#fff;color:#405951;border-color:#cbd7d1;box-shadow:none;}
+
+/* Navy design foundation: spacious cards, restrained color. */
+.page-home {max-width:1080px;}
+.welcome-cards {gap:26px;}
+.welcome-card {min-height:350px;padding:34px;border-radius:16px;}
+.welcome-card.basics {background:#f0f3f7;border:1px solid #d4dce7;}
+.welcome-card.build {background:#fffefb;border:1px solid #dddfe3;}
+.welcome-card h2 {font-size:28px;color:#182d48;}
+.welcome-card p {font-size:16px;line-height:1.75;color:#526074;}
+.welcome-card.basics .feature-icon,.welcome-card.build .feature-icon {background:#e5eaf0;color:#233c5d;border-radius:14px;}
+.welcome-card.basics .primary {background:#233c5d;box-shadow:none;}
+.welcome-card.basics .primary:hover {background:#172b44;}
+.welcome-card.build .secondary {color:#233c5d;border-color:#bdc8d6;background:transparent;}
+.page-learn {--blue:#233c5d;--muted:#526074;color:#182d48;}
+.page-learn .lesson-grid {gap:14px;}
+.page-learn .lesson-card {min-height:110px;padding:22px 24px;background:#fffefb;border-color:#d9dee5;border-radius:10px;justify-content:center;gap:12px;}
+.page-learn .lesson-card strong {font-size:18px;color:#182d48;}
+.page-learn .lesson-card small {color:#617086;}
+.page-learn .lesson-card.selected {background:#eef2f7;border-color:#233c5d;box-shadow:inset 3px 0 #233c5d;}
+.page-learn .lesson-content {border-radius:12px;padding:36px;border-color:#d9dee5;}
+.page-learn .lesson-content h2,.page-learn .lesson-content h3 {color:#182d48;}
+.page-learn .lesson-content p {color:#526074;}
+.page-learn .quiz-choice {color:#233c5d;border-color:#d9dee5;border-radius:8px;padding:18px;}
+.page-learn .quiz-choice.selected,.page-learn .quiz-choice:hover {background:#eef2f7;border-color:#233c5d;}
+.page-learn .primary,.page-learn .send {background:#233c5d;}
+.page-learn .primary:hover,.page-learn .send:hover {background:#172b44;}
+.page-learn .secondary {color:#233c5d;border-color:#bdc8d6;}
+.page-learn .secondary:hover {background:#eef2f7;}
+.page-learn .tabs button[aria-pressed=true] {color:#233c5d;border-color:#233c5d;background:#eef2f7;}
+.page-learn button:focus-visible,.page-learn a:focus-visible {outline-color:#7892b4;}
+@media(max-width:600px){.welcome-card{min-height:310px;padding:26px;}.page-learn .lesson-content{padding:22px;}}
+
+/* Distinct lesson cards, with one strong navy selection. */
+.page-learn .lesson-grid {gap:18px;}
+.page-learn .lesson-card {min-height:238px;padding:24px;border:1px solid #d8dfe8;border-radius:16px;gap:14px;justify-content:flex-start;box-shadow:0 4px 14px #182d4807;transition:border-color .15s,box-shadow .15s;}
+.page-learn .lesson-card span {display:block;}
+.page-learn .lesson-card .lesson-card-top {display:flex;justify-content:space-between;align-items:center;width:100%;}
+.page-learn .lesson-card .lesson-number {font-size:30px;font-weight:500;letter-spacing:-.04em;color:#7b8da3;line-height:1;}
+.page-learn .lesson-card .lesson-topic-icon {display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#edf1f6;color:#233c5d;}
+.page-learn .lesson-card strong {font-size:21px;line-height:1.35;max-width:25ch;}
+.page-learn .lesson-card .lesson-description {font-size:14px;line-height:1.6;color:#596b80;}
+.page-learn .lesson-card .lesson-card-bottom {display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:auto;padding-top:14px;border-top:1px solid #e3e8ee;}
+.page-learn .lesson-card .lesson-card-bottom small {font-size:12px;font-weight:600;}
+.page-learn .lesson-card .lesson-card-bottom .icon {width:19px;height:19px;color:#233c5d;}
+.page-learn .lesson-card:hover {border-color:#8195ad;box-shadow:0 6px 20px #182d4810;}
+.page-learn .lesson-card.selected {background:#233c5d;border-color:#233c5d;box-shadow:0 8px 22px #233c5d21;}
+.page-learn .lesson-card.selected strong {color:#fff;}
+.page-learn .lesson-card.selected .lesson-number {color:#a8bdd6;}
+.page-learn .lesson-card.selected .lesson-description,.page-learn .lesson-card.selected small {color:#d5e0ee;}
+.page-learn .lesson-card.selected .lesson-topic-icon {background:#ffffff14;color:#fff;}
+.page-learn .lesson-card.selected .lesson-card-bottom {border-color:#ffffff26;}
+.page-learn .lesson-card.selected .lesson-card-bottom .icon {color:#fff;}
+@media(prefers-reduced-motion:reduce){.page-learn .lesson-card{transition:none;}}
