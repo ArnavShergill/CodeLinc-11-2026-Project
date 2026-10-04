@@ -44,6 +44,10 @@ const referenceResult=require('./fixtures/reference-result.json');
   });
   await page.goto(process.env.QA_BASE_URL||(process.env.QA_STATIC_ROOT?'https://arnavshergill.github.io/CodeLinc-11-2026-Project/':'http://127.0.0.1:5173'));
   const go=async route=>{await page.evaluate(r=>location.hash=r,route);await page.waitForTimeout(150);};
+  await go('welcome');await page.locator('#first-name').fill('Jordan');await page.getByRole('button',{name:'Continue',exact:true}).click();
+  await page.locator('.user').getByText('Jordan',{exact:true}).waitFor();
+  await go('home');await page.getByRole('heading',{name:'Welcome, Jordan',exact:true}).waitFor();
+  await page.reload();await page.getByRole('heading',{name:'Welcome, Jordan',exact:true}).waitFor();
   await go('learn');await page.getByRole('button',{name:'Start my first lesson'}).click();
   await page.getByRole('heading',{name:'Who life insurance helps',exact:true}).waitFor();
   await page.getByRole('button',{name:'Beneficiaries',exact:true}).click();await page.getByText('You’ve got it.',{exact:true}).waitFor();
@@ -94,14 +98,17 @@ const referenceResult=require('./fixtures/reference-result.json');
 
   for(const viewport of [{width:1440,height:1000},{width:768,height:1024},{width:390,height:844}]){
    await page.setViewportSize(viewport);
-   for(const route of ['landing','home','intake','review','results','breakdown','simulator','learn']){
+   for(const route of ['landing','welcome','home','intake','review','results','breakdown','simulator','learn']){
     await go(route);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Overflow '+route+' at '+viewport.width);
    }
   }
   await go('intake');await page.getByRole('button',{name:'Clear my details and conversation'}).click();
   assert.equal(await page.locator('.captured-row').count(),0);assert.equal(await page.locator('.message.customer').count(),0);
   assert.equal(await page.locator('input[type="checkbox"]').count(),0);
+  assert.equal(await page.locator('.user').getByText('Jordan',{exact:true}).count(),0);
+  await go('welcome');await page.getByRole('button',{name:'Continue without a name',exact:true}).click();
+  await page.getByRole('button',{name:'Learn the Basics',exact:true}).waitFor();
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({confirmation:'passed',corrections:'passed',retry:'passed',privacy:'passed',context:'passed',personalizedCalculations:'passed',lessonQuiz:'passed',scenarioContext:'passed',calculationCalls,scenarioCalls,lessonCalls,routes:'8 at desktop/tablet/mobile',intakeCalls,advisorCalls,errors},null,2));
+  console.log(JSON.stringify({confirmation:'passed',corrections:'passed',retry:'passed',privacy:'passed',context:'passed',personalizedCalculations:'passed',lessonQuiz:'passed',scenarioContext:'passed',calculationCalls,scenarioCalls,lessonCalls,welcomeAndGreeting:'passed',routes:'9 at desktop/tablet/mobile',intakeCalls,advisorCalls,errors},null,2));
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

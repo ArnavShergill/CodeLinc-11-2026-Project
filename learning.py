@@ -19,7 +19,8 @@ def make_lesson(topic, context):
     context = clean_context(context)
     prompt = (
         'You are a calm LifeMap educator. Create a short interactive lesson grounded in the supplied teaching brief. '
-        'Use plain language, avoid fear, and adapt an example to confirmed details if present; otherwise label it a hypothetical example. '
+        'Write for an adult who is new to insurance: respectful, practical language, no childish tone. Define unfamiliar terms as they appear. '
+        'Avoid fear and adapt an example to confirmed details if present; otherwise label it a hypothetical example. '
         'Never invent missing facts, calculator numbers, premium prices, guaranteed returns or a product recommendation. '
         'Return ONLY a JSON object with title, explanation (2 short paragraphs), example (one concrete example), '
         'question (one comprehension question), choices (3 brief strings), correctIndex (0,1 or 2), why (2 sentences). '

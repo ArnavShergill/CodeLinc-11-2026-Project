@@ -28,11 +28,11 @@
  */
 export const profileFields = [
  ['annualIncome','Annual income','money'],['spouseAnnualIncome','Spouse annual income','money'],
- ['numberOfDependents','Financial dependents','count'],['childrenAges','Children’s ages','ages'],
+ ['numberOfDependents','People relying on your income','count'],['childrenAges','Children’s ages','ages'],
  ['mortgageBalance','Mortgage balance','money'],['otherDebt','Other debt','money'],
- ['finalExpenses','Final expenses','money'],['desiredAnnualIncome','Desired annual income','money'],
- ['incomeReplacementYears','Income replacement years','count'],['collegeFundingNeed','College funding need','money'],
- ['existingLifeInsurance','Existing life insurance','money'],['availableAssets','Available assets','money'],
+ ['finalExpenses','Final expenses','money'],['desiredAnnualIncome','Yearly income for your family','money'],
+ ['incomeReplacementYears','Years of family income support','count'],['collegeFundingNeed','College funding need','money'],
+ ['existingLifeInsurance','Existing life insurance','money'],['availableAssets','Savings and other available money','money'],
  ['inflationRate','Inflation rate','rate'],['investmentReturnRate','Investment return rate','rate']
 ];
 export function validateProfile(profile) {

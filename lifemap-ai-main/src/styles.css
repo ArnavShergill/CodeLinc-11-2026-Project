@@ -41,3 +41,15 @@
 .chart-legend span:last-child {color:#a15d19;}
 .situation-summary {padding:16px;background:#edf4f1;border-radius:12px;line-height:1.6;}
 @media(max-width:600px){.lesson-content{padding:18px;}.lesson-grid{grid-template-columns:1fr;}.protection-controls label,#scenario-form label{min-width:100%;}.result-actions{flex-wrap:wrap;}}
+
+.welcome-start {max-width:700px;padding:28px;margin:0 auto;line-height:1.65;}
+.welcome-start form>label {display:block;font-size:18px;font-weight:600;margin-bottom:10px;}
+.welcome-start input[type=text] {width:100%;padding:14px;border:1px solid #b9ced2;border-radius:10px;font-size:18px;}
+.welcome-start fieldset {border:0;padding:0;margin:24px 0;}
+.welcome-start legend {font-weight:600;font-size:18px;margin-bottom:12px;}
+.start-choice {display:flex;align-items:flex-start;gap:12px;padding:18px;border:1px solid #cbdcde;border-radius:12px;margin:12px 0;cursor:pointer;}
+.start-choice input {margin-top:7px;accent-color:#0866f5;flex:none;}
+.start-choice span {display:flex;flex-direction:column;gap:6px;}
+.start-choice small {font-size:15px;color:#4b626a;}
+.welcome-start .button {margin-right:12px;}
+.lesson-content,.lesson-card,.quiz-choice {overflow-wrap:anywhere;}

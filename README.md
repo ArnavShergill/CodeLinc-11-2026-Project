@@ -6,13 +6,15 @@ LifeMap collects confirmed planning details through conversational intake and pr
 
 ## What works
 
+- An optional first-name welcome step personalizes greetings and offers a learn-first or plan-first choice. The name is stored only in sessionStorage for the current tab and is not sent to AI. No email, password, or authenticated account is created. End session and Clear my details remove it. Financial details still reset on reload.
+
 - Profiles start empty. Intake extracts stated facts, including multiple fields and corrections, and proposes them for explicit confirmation before saving.
 - AI-generated mini-lessons cover protection, needs, term/permanent tradeoffs, future changes, and next steps. Each includes an example, a comprehension check, and personalized follow-up with the tutor. Users can learn before sharing details and switch into planning at any time.
 - The simulator starts with the calculated profile and reruns the same calculator for explicit life-event changes. It models proposed additional coverage over a chosen duration, compares remaining need, and lists assumptions. It does not treat a death benefit as income received when coverage starts.
 - All 14 fields in the existing shared contract are supported. Missing fields are asked one at a time. Review allows manual corrections; a complete synthetic sample is available as a separate shortcut.
 - Ask LifeMap receives the confirmed profile, recent conversation, calculator result, and its source. The team reference calculator is identified accurately, and an example profile is labeled when used.
 - Requests have a timeout, duplicate-send protection, progress indicators, and retry without adding the same message twice.
-- A short informational notice explains AI processing; chat sends immediately without a checkbox. Clear my details removes the in-tab profile and conversation. Reload also resets the session. No localStorage or account persistence is used.
+- A short informational notice explains AI processing; chat sends immediately without a checkbox. Clear my details removes the in-tab profile and conversation. Reload also resets the session. No localStorage or saved financial account is used. Only the optional first name is kept in sessionStorage for the tab.
 - Server validation limits message length, conversation size, profile values, and request-body size. Provider errors and visitor addresses are excluded from application logs. Per-instance limits allow up to 20 requests per minute per client and four concurrent model requests. Distributed rate limiting is not provided by this in-memory guard; configure a hosting-edge rule before relying on a global limit.
 
 ## Local development
