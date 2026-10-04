@@ -6,6 +6,35 @@ export const intakeQuestions = mockConversation.questions;
 const delay = () => new Promise(resolve=>setTimeout(resolve,350));
 const API_URL = 'http://127.0.0.1:8000/api/chat';
 
+const FALLBACK_PATTERNS = [
+ /Could not reach Ollama/i,
+ /Start Ollama/i,
+ /gemma3:latest/i,
+ /fetch failed/i,
+ /ERR_CONNECTION_REFUSED/i,
+ /ECONNREFUSED/i,
+ /HTTP 502/i,
+ /HTTP 503/i,
+ /local Ollama model/i,
+ /The Ollama Python package is not installed/i
+];
+
+function isFallbackError(message='') {
+ return FALLBACK_PATTERNS.some(pattern => pattern.test(message));
+}
+
+function fallbackReply(message='') {
+ const cleaned = String(message || '').trim().replace(/\s+/g,' ');
+ const lower = cleaned.toLowerCase();
+ if(/income|salary|earn|pay/.test(lower)) {
+  return 'I\'m in demo mode because the local Ollama service is unavailable. For this sample, the plan assumes a $75,000 annual income and a family-focused protection need.';
+ }
+ if(/depend|children|family|mortgage|home/.test(lower)) {
+  return 'I\'m in demo mode because the local Ollama service is unavailable. This example still reflects a married household with two children and a mortgage alongside other family protection needs.';
+ }
+ return 'I\'m in demo mode because the local Ollama service is unavailable right now. The app is still running with its sample profile, and starting Ollama with the gemma3:latest model will restore live answers.';
+}
+
 export async function askLifeMap(message,conversation=[]) {
  if(!message.trim()) throw new Error('Please add a message before sending.');
  let response;
@@ -22,15 +51,22 @@ export async function askLifeMap(message,conversation=[]) {
    })
   });
  } catch(error) {
-  throw new Error('Cannot reach the LifeMap API. Start it with `npm run api`.',{cause:error});
+  return fallbackReply(message);
  }
  let payload;
  try {
   payload=await response.json();
  } catch {
+  if(!response.ok) return fallbackReply(message);
   throw new Error('The LifeMap API returned an invalid response.');
  }
- if(!response.ok) throw new Error(payload.error||`The LifeMap API returned HTTP ${response.status}.`);
+ const errorText = payload.error || '';
+ if(!response.ok) {
+  if(isFallbackError(errorText) || isFallbackError(`HTTP ${response.status}`)) {
+   return fallbackReply(message);
+  }
+  throw new Error(errorText || `The LifeMap API returned HTTP ${response.status}.`);
+ }
  if(typeof payload.reply!=='string'||!payload.reply.trim()) {
   throw new Error('The LifeMap API returned an empty reply.');
  }

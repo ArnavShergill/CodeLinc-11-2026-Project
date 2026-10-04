@@ -30,24 +30,26 @@ test('intake calls the Python AI bridge while keeping profile values synthetic',
   globalThis.fetch=originalFetch;
  }
 });
-test('AI bridge errors are shown to callers',async()=>{
+test('AI bridge errors fall back to a demo reply when Ollama is unavailable',async()=>{
  const originalFetch=globalThis.fetch;
  globalThis.fetch=async()=>({
   ok:false,
   status:502,
-  json:async()=>({error:'Start Ollama and check the model.'})
+  json:async()=>({error:'Could not reach Ollama at http://127.0.0.1:11434/api/chat. Start Ollama and ensure the model gemma3:latest is available.'})
  });
  try{
-  await assert.rejects(askLifeMap('What is life insurance?'),/Start Ollama/);
+  const reply=await askLifeMap('What is life insurance?');
+  assert.match(reply,/demo mode|gemma3:latest|sample profile/i);
  }finally{
   globalThis.fetch=originalFetch;
  }
 });
-test('unavailable Python API reports how to start the service',async()=>{
+test('unavailable Python API falls back to the demo assistant',async()=>{
  const originalFetch=globalThis.fetch;
  globalThis.fetch=async()=>{throw new TypeError('fetch failed');};
  try{
-  await assert.rejects(askLifeMap('Hello'),/npm run api/);
+  const reply=await askLifeMap('Hello');
+  assert.match(reply,/demo mode|local Ollama service/i);
  }finally{
   globalThis.fetch=originalFetch;
  }
