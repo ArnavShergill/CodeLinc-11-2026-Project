@@ -43,3 +43,27 @@ test('configured calculator and scenario adapters pass profile and changes to ba
   await withFetch(async(url,options)=>{const body=JSON.parse(options.body);assert.deepEqual(body.profile,mockProfile);if(url.endsWith('/scenario'))assert.deepEqual(body.changes,{mortgageBalance:250000});return {ok:true,json:async()=>({result:mockResult,timeline:[0,5,10,15,20].map(year=>({year,additionalNeed:650000,proposedCoverage:650000,remainingGap:0}))})};},async()=>{assert.equal((await service.calculatePlan(mockProfile)).source,'backend');assert.equal((await service.calculateScenario(mockProfile,'home',{mortgageBalance:250000})).source,'backend');});
  }finally{delete globalThis.window;}
 });
+
+test('chat carries assessment profile and calculator state into the next turn',async()=>{
+ let context={profile:{mortgageBalance:100000},assessment:{active:true}};
+ await withFetch(async(url,options)=>{
+  const body=JSON.parse(options.body);assert.deepEqual(body.context,context);
+  return {ok:true,json:async()=>({reply:'How much other debt should be included?',profile:{mortgageBalance:100000,existingLifeInsurance:50000},assessment:{active:true,field:'otherDebt'},mode:'assessment'})};
+ },async()=>{
+  const reply=await askLifeMap('I already have 50k coverage',[],context,response=>{context={profile:response.profile,assessment:response.assessment};});
+  assert.match(reply,/other debt/);assert.equal(context.profile.mortgageBalance,100000);assert.equal(context.profile.existingLifeInsurance,50000);
+ });
+ await withFetch(async(url,options)=>{
+  const body=JSON.parse(options.body);assert.equal(body.context.profile.existingLifeInsurance,50000);
+  return {ok:true,json:async()=>({reply:'The backend calculated your needs.',profile:mockProfile,assessment:{active:true,field:null},mode:'complete',result:mockResult})};
+ },async()=>{let calculation;await askLifeMap('Here are the remaining details',[],context,response=>{calculation=response.result;});assert.deepEqual(calculation,mockResult);});
+});
+
+test('calculator required fields match backend and omitted optional assumptions remain omitted',async()=>{
+ const required={mortgageBalance:180000,otherDebt:25000,finalExpenses:15000,desiredAnnualIncome:50000,incomeReplacementYears:10,collegeFundingNeed:80000,existingLifeInsurance:100000,availableAssets:50000};
+ assert.deepEqual(validateProfile(required),[]);
+ assert.deepEqual(validateProfile({...required,inflationRate:null,investmentReturnRate:null}),[]);
+ assert.ok(validateProfile({...required,availableAssets:null}).length);
+ assert.ok(validateProfile({...required,inflationRate:NaN}).length);
+ assert.ok(validateProfile({...required,incomeReplacementYears:121}).length);
+});

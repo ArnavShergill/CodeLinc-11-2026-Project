@@ -86,12 +86,51 @@ _NUMBER_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+RATE_FIELDS = ("inflationRate", "investmentReturnRate")
+
+
+class RateInputError(ValueError):
+    """A rate needs clarification before any profile update is committed."""
+
+
+def normalize_conversational_rate(answer: str) -> float:
+    """Human answers use percentage points; calculator inputs remain fractions.
+
+    The conversational guard accepts 0–20%. This does not alter calculator
+    validation or methodology; higher assumptions require an explicit review.
+    """
+    text = answer.strip().lower()
+    for word, number in {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5}.items():
+        text = re.sub(r"\b" + word + r"\b", str(number), text)
+    match = re.fullmatch(r"(?:about|around|approximately|roughly)?\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*(%|percent|per cent)?[.!]?", text)
+    guidance = "Please enter the rate as a percentage from 0 to 20, such as 2 or 2%."
+    if not match:
+        raise RateInputError(guidance)
+    points = float(match.group(1))
+    if not 0 <= points <= 20:
+        raise RateInputError(guidance)
+    if 0 < points < 1 and not match.group(2):
+        raise RateInputError(f"Just to confirm, do you mean {points:g}% or {points * 100:g}%?")
+    return points / 100
+
+
+def conversational_rate_updates(message: str, current_field: Optional[str] = None) -> dict:
+    if current_field in RATE_FIELDS:
+        return {current_field: normalize_conversational_rate(message)}
+    updates = {}
+    for field, label in (("inflationRate", r"inflation(?: rate)?"),
+                         ("investmentReturnRate", r"(?:investment )?return(?: rate)?")):
+        match = re.search(r"\b" + label + r"\s*(?:is|of|at|=|:)?\s*((?:about\s+)?[+-]?(?:\d+(?:\.\d+)?|\.\d+)\s*(?:%|percent|per cent)?)", message, re.I)
+        if match:
+            updates[field] = normalize_conversational_rate(match.group(1))
+    return updates
+
 
 def get_demo_profile() -> Dict[str, Any]:
     """Return a fresh copy of the synthetic workflow fixture."""
     return dict(DEMO_PROFILE, childrenAges=list(DEMO_PROFILE["childrenAges"]))
 
-def API_request(message: str, conversation: Optional[List[dict]] = None, context: Optional[dict] = None) -> str:
+def _educational_reply(message: str, conversation: Optional[List[dict]] = None, context: Optional[dict] = None) -> str:
     """Send a chat request to the configured local or cloud Ollama service."""
     if not isinstance(message, str) or not message.strip():
         raise ValueError("A non-empty message is required.")
@@ -100,7 +139,7 @@ def API_request(message: str, conversation: Optional[List[dict]] = None, context
         "role": "system",
         "content": (
             "You are LifeMap AI, an educational life-insurance planning assistant. "
-            "Be calm, clear, and supportive. Use up to 3 short paragraphs when teaching, otherwise up to 3 sentences. Do not present estimates as quotes or "
+            "Be calm, clear, and supportive. Use at most 3 short sentences in plain text without Markdown. Answer educational questions directly. Do not present estimates as quotes or "
             "professional financial advice."
             "Help the user understand their choices and plan their life insurance needs. "
             "Speak to an adult who may be new to insurance. Be respectful, never childish or patronizing. "
@@ -197,7 +236,26 @@ def _extract_direct_answer(
         return profile
 
     field = missing_fields[0]
-    match = _NUMBER_PATTERN.search(user_input)
+    answer = user_input.strip().lower().rstrip('.!')
+    zero_phrases = {"mortgageBalance": ("no mortgage",), "otherDebt": ("no debt",),
+                    "existingLifeInsurance": ("no insurance", "no coverage"), "availableAssets": ("no assets",)}
+    if answer in ("none", "zero", "no", "nothing", "not applicable", "n/a") + zero_phrases.get(field, ()):
+        profile[field] = 0
+        return profile
+    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+             "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+             "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
+             "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20}
+    for word, number in words.items():
+        answer = re.sub(r"\b" + word + r"\b", str(number), answer)
+    # Only unambiguous answers to the current question; never borrow a number
+    # from a labelled, multi-field message or an educational question.
+    direct = re.fullmatch(
+        r"(?:about |around |approximately |roughly )?\$?\d[\d,]*(?:\.\d+)?\s*"
+        r"(?:k|thousand|m|million|b|billion)?\s*(?:years?|dollars?|per year)?", answer)
+    if field != "incomeReplacementYears" and re.search(r"\byears?\b", answer):
+        direct = None
+    match = _NUMBER_PATTERN.search(answer) if direct else None
     if match is None:
         return profile
 
@@ -237,48 +295,61 @@ def _chat(messages: List[dict], *, json_mode: bool = False) -> str:
 
 
 def extract_profile_data(
-    user_input: str, current_profile_state: Optional[dict] = None
+    user_input: str, current_profile_state: Optional[dict] = None, current_field: Optional[str] = None
 ) -> dict:
     """
     Takes natural language input, processes it through Ollama,
     and returns a strictly formatted dictionary for the backend calculator.
     """
-    # The system prompt enforces the AI boundary: extract data, do not calculate.
-    existing_profile = _validated_profile(current_profile_state)
+    from chat_features import clean_profile
+    existing_profile = _validated_profile(clean_profile(current_profile_state or {}))
+    rate_updates = conversational_rate_updates(user_input, current_field)
+    if current_field in RATE_FIELDS:
+        return clean_profile({**existing_profile, **rate_updates})
+    question = get_next_question(existing_profile)
+    system_prompt = (
+        "Extract all profile values explicitly supplied in the latest message. Return only a JSON object "
+        "with exact LifeNeedsProfile field names. You extract facts; never calculate coverage or answer questions. "
+        "Omit unknown fields. Never copy or delete existing facts. Include explicit corrections. "
+        "Use the current question to interpret a short answer: none means 0 for an amount, "
+        "about 100k means 100000, ten years means 10. Labelled facts belong to their stated field, "
+        "not automatically to the current question. Do not turn educational examples into personal facts. "
+        "Rates are fractions, e.g. 2% is 0.02. No inferred education goal, income-support goal, or family facts.\n"
+        "Schema: " + json.dumps(LifeNeedsProfile.model_json_schema())
+    )
     try:
-        schema = json.dumps(LifeNeedsProfile.model_json_schema(), indent=2)
-        system_prompt = (
-            "Extract only facts explicitly stated by the user into a JSON object "
-            "using the exact LifeNeedsProfile field names and schema below. "
-            "Do not calculate insurance needs, infer unstated values, or ask a question. "
-            "Omit unknown fields or set them to null.\n"
-            f"Schema:\n{schema}"
-        )
         content = _chat([
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_input},
-        ], json_mode=True)
+            {"role": "user", "content": json.dumps({"existingProfile": existing_profile,
+                "currentQuestion": question, "message": user_input})},
+        ], json_mode=True).strip()
+        if content.startswith("```"):
+            content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content)
         extracted_data = json.loads(content)
         if not isinstance(extracted_data, dict):
-            raise ValueError("Ollama returned a non-object profile.")
-
-        extracted_profile = LifeNeedsProfile(**extracted_data).model_dump(
-            exclude_unset=True, exclude_none=True
-        )
-        updated_profile = {**existing_profile, **extracted_profile}
-        if updated_profile != existing_profile:
-            return updated_profile
-    except Exception as e:
-        logger.warning("Profile extraction failed; trying a direct answer.")
-
-    fallback_profile = _extract_direct_answer(user_input, existing_profile)
-    if fallback_profile != existing_profile:
-        return fallback_profile
-
-    raise RuntimeError(
-        "Could not extract an answer. Start Ollama with the llama3 model, "
-        "or answer the current question with a number (for example, $180,000 or 10 years)."
-    )
+            raise ValueError("The extracted profile must be an object.")
+        # Never let a model guess the unit of a conversational rate.
+        for field in RATE_FIELDS:
+            extracted_data.pop(field, None)
+        extracted_data.update(rate_updates)
+        # Validate before Pydantic coercion (booleans, negatives and NaN are not facts).
+        extracted_profile = clean_profile(extracted_data)
+        extracted_profile = LifeNeedsProfile(**extracted_profile).model_dump(exclude_unset=True, exclude_none=True)
+    except json.JSONDecodeError:
+        logger.warning("Profile extraction returned invalid JSON; trying the current direct answer.")
+        extracted_profile = {}
+    except ValueError:
+        # Invalid numeric values cannot be committed.
+        raise ValueError("Please provide non-negative amounts and whole-number years.") from None
+    except Exception:
+        logger.warning("Profile extraction unavailable; trying the current direct answer.")
+        extracted_profile = {}
+    merged = {**existing_profile, **extracted_profile, **rate_updates}
+    direct = _extract_direct_answer(user_input, existing_profile)
+    for key, value in direct.items():
+        if existing_profile.get(key) != value:
+            merged[key] = value
+    return clean_profile(_validated_profile(merged))
 
 
 def get_missing_required_fields(profile: Optional[dict]) -> List[str]:
@@ -332,6 +403,10 @@ def _fallback_explanation(result: dict) -> str:
     return f"The calculation reports additional coverage needed of {coverage}."
 
 
+def _qualitative_only(text: str) -> bool:
+    return bool(text.strip()) and not re.search(r"[\d$€£]|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|dollars|cents|percent|double|triple|twice)\b", text, re.I)
+
+
 def explain_result(result: dict) -> str:
     """Explain a backend result without changing or recalculating its values."""
     result_json = json.dumps(result, indent=2)
@@ -341,18 +416,119 @@ def explain_result(result: dict) -> str:
                 "role": "system",
                 "content": (
                     "Explain the supplied life-insurance needs result in plain language. "
+                    "Use at most two short sentences, plain text without Markdown. Describe why debts, family income and resources matter. Do not include any numbers, amounts, or a new recommendation. "
                     "Use only the result's stated values and assumptions. Do not calculate, "
                     "round, alter, or invent any result; make clear this is an estimate."
                 ),
             },
             {"role": "user", "content": f"Backend result JSON:\n{result_json}"},
         ])
-        if explanation.strip():
-            return explanation.strip()
+        if _qualitative_only(explanation):
+            return _fallback_explanation(result) + " " + _plain_reply(explanation)
     except Exception:
         logger.exception("Could not explain the backend result with Ollama.")
 
     return _fallback_explanation(result)
+
+def _plain_reply(text: str) -> str:
+    """The chat UI renders text, so remove common model formatting."""
+    text = re.sub(r"(?m)^\s*(?:#{1,6}\s+|[-*]\s+|\d+[.)]\s+)", "", text.strip())
+    text = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", text)
+    text = text.replace("**", "").replace("__", "").replace("`", "")
+    sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
+    return " ".join(sentences[:3])[:800].strip()
+
+
+def explain_projection(simulation: dict) -> str:
+    """Only calculator-supplied timeline amounts may enter a projection explanation."""
+    points = simulation.get("timeline", [])
+    if not points:
+        return "Your projection is not ready yet. Apply your changes to calculate it first."
+    first, last = points[0], points[-1]
+    facts = (f"At the start, the calculator reports additional need of {first['additionalNeed']}, "
+             f"modeled coverage of {first['proposedCoverage']}, and remaining gap of {first['remainingGap']}. "
+             f"At year {last['year']}, it reports additional need of {last['additionalNeed']}. "
+             "This is conditional support after a covered death, not guaranteed income or a prediction.")
+    try:
+        explanation = _chat([
+            {"role": "system", "content": "Explain this calculator projection in one short plain-language sentence. No numbers, monetary amounts, new recommendations, or guarantees. Describe that income-support years reduce while other inputs are held constant unless explicitly changed."},
+            {"role": "user", "content": json.dumps(simulation)},
+        ])
+        if _qualitative_only(explanation):
+            return facts + " " + _plain_reply(explanation)
+    except Exception:
+        pass
+    return facts
+
+
+def chat_turn(message: str, conversation: Optional[List[dict]] = None, context: Optional[dict] = None) -> dict:
+    """Client-carried state: validated profile in, merged profile and next state out.
+
+    No process-global customer state; requests remain compatible with serverless hosting.
+    """
+    from chat_features import clean_profile
+    from calculator_bridge import calculate
+    if not isinstance(message, str):
+        raise ValueError("A non-empty message is required.")
+    context = context or {}
+    profile = clean_profile(context.get("profile", {}))
+    state = context.get("assessment", {})
+    rate_field = state.get("field") if state.get("field") in RATE_FIELDS else None
+    if rate_field:
+        try:
+            profile = extract_profile_data(message, profile, rate_field)
+        except RateInputError as error:
+            return {"reply": str(error), "profile": profile, "mode": "assessment",
+                    "assessment": {"active": True, "field": rate_field}}
+    elif not message.strip():
+        raise ValueError("A non-empty message is required.")
+    active = bool(state.get("active"))
+    if "assessment" not in context:
+        # Older clients can continue a partial supplied profile without the new flag.
+        active = bool(any(field in profile for field in REQUIRED_PROFILE_FIELDS)
+                      and get_missing_required_fields(profile)
+                      and not any(context.get(key) for key in ("result", "learning", "simulation")))
+    text = message.strip().lower()
+    if re.fullmatch(r"(?:hi|hello|hey|good morning|good afternoon|good evening)[!. ]*", text):
+        reply = get_next_question(profile) if active and get_missing_required_fields(profile) else "Hi! Thank you for visiting LifeMap. You can learn about life insurance or ask how much protection you might need. We’ll take it one step at a time."
+        return {"reply": reply, "profile": profile, "mode": "assessment" if active else "education",
+                "assessment": {"active": active, "field": get_missing_required_fields(profile)[0] if active and get_missing_required_fields(profile) else None}}
+    wants_assessment = bool(re.search(
+        r"how much (?:life )?(?:insurance|coverage) (?:do |would |will |should )?(?:i|we) (?:need|buy|get|have)|"
+        r"(?:assess|calculate|estimate|work out).*(?:need|coverage|insurance)|"
+        r"(?:build|start|continue|resume).*(?:plan|profile|assessment)|my (?:insurance|coverage) needs|i need (?:life )?insurance", text))
+    education = bool(re.search(r"^(?:what (?:is|are|does)|how does|explain|what.s the difference|why|can you explain|walk me through|help me understand)\b", text))
+    personal_facts = bool(re.search(r"\b(?:my|our|i have|i owe|i earn|we have)\b", text) and
+                          re.search(r"\d|\b(?:none|zero|no debt|no mortgage)\b", text))
+    if (education and not wants_assessment) or not (active or wants_assessment or personal_facts):
+        # An educational interruption preserves the pending assessment and all facts.
+        if context.get("simulation") and re.search(r"projection|future|scenario|simulation", text):
+            reply = explain_projection(context["simulation"])
+        elif context.get("result") and re.search(r"result|estimate|this amount|my plan|so much|coverage amount|calculated", text):
+            reply = explain_result(context["result"])
+        else:
+            reply = _plain_reply(_educational_reply(message, conversation, {**context, "profile": profile}))
+        return {"reply": reply, "profile": profile, "mode": "education",
+                "assessment": {"active": active, "field": get_missing_required_fields(profile)[0] if active and get_missing_required_fields(profile) else None}}
+    try:
+        if not rate_field:
+            profile = extract_profile_data(message, profile)
+    except RateInputError as error:
+        return {"reply": str(error), "profile": profile, "mode": "assessment",
+                "assessment": {"active": True, "field": state.get("field")}}
+    missing = get_missing_required_fields(profile)
+    if missing:
+        return {"reply": get_next_question(profile), "profile": profile, "mode": "assessment",
+                "missingFields": missing, "assessment": {"active": True, "field": missing[0]}}
+    result = calculate(profile)
+    return {"reply": explain_result(result), "profile": profile, "mode": "complete", "result": result,
+            "resultSource": "backend", "missingFields": [], "assessment": {"active": True, "field": None}}
+
+
+def API_request(message: str, conversation: Optional[List[dict]] = None, context: Optional[dict] = None) -> str:
+    """Compatibility entry point; HTTP clients use chat_turn for profile state."""
+    return chat_turn(message, conversation, context)["reply"]
+
 
 # --- Example usage for the First Vertical Slice ---
 if __name__ == "__main__":

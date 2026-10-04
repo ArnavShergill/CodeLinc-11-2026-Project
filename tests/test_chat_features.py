@@ -61,17 +61,17 @@ class ChatTests(unittest.TestCase):
         return output[0]
 
     def test_http_accepts_chat_without_checkbox_and_rejects_invalid_requests(self):
-        with patch('api_server.API_request',return_value='Hello'):
+        with patch('api_server.chat_turn',return_value={'reply':'Hello'}):
             self.assertEqual(self.request({'message':'hello'})[0],200)
         self.assertEqual(self.request({'message':'hello'},origin='https://evil.example')[0],403)
         self.assertEqual(self.request({'message':'x'*2001})[0],400)
 
     def test_http_passes_context_and_hides_provider_errors(self):
         body={'message':'hello','context':{'profile':{'annualIncome':90000}}}
-        with patch('api_server.API_request',return_value='Answer') as model:
+        with patch('api_server.chat_turn',return_value={'reply':'Answer'}) as model:
             self.assertEqual(self.request(body),(200,{'reply':'Answer'}))
             self.assertEqual(model.call_args.args[2]['profile'],{'annualIncome':90000})
-        with patch('api_server.API_request',side_effect=RuntimeError('secret-provider-details')):
+        with patch('api_server.chat_turn',side_effect=RuntimeError('secret-provider-details')):
             status,payload=self.request(body)
             self.assertEqual(status,502)
             self.assertNotIn('secret-provider-details',str(payload))

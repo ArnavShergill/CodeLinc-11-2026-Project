@@ -29,6 +29,7 @@ async function post(url,body){
  catch(error){throw Error(error.name==='TimeoutError'?'The request timed out. Your message is saved; please retry.':'Could not reach the LifeMap AI backend. Your message is saved; please retry.');}
  let payload;
  try{payload=await response.json();}catch{throw Error('The backend returned an invalid response. Please retry.');}
+ if(!response.ok&&payload.code==='AI_NOT_CONFIGURED')throw Error('Local AI needs your Ollama Cloud key in .env.local. Add it, then retry.');
  if(!response.ok)throw Error(response.status===429?'Too many requests. Please wait a minute and retry.':response.status===400?(payload.error||'Please check your information.'):'The LifeMap AI backend is unavailable. Please retry.');
  return payload;
 }
@@ -37,9 +38,10 @@ function requestBody(message,conversation,context){
  const details=context;
  return {message,context:details,conversation:conversation.slice(-20).map(turn=>({role:turn.role==='customer'?'user':turn.role,content:turn.text}))};
 }
-export async function askLifeMap(message,conversation=[],context={}){
+export async function askLifeMap(message,conversation=[],context={},onState){
  const payload=await post(chatUrl,requestBody(message,conversation,context));
  if(typeof payload.reply!=='string'||!payload.reply.trim())throw Error('The AI returned an empty answer. Please retry.');
+ if(onState&&payload.profile&&payload.assessment){const profile=validUpdates(payload.profile);if(payload.result)validateResult(payload.result);onState({...payload,profile});}
  return payload.reply;
 }
 export async function sendIntakeMessage({profile,questionIndex,message,conversation=[]}){

@@ -35,9 +35,11 @@ export const profileFields = [
  ['existingLifeInsurance','Existing life insurance','money'],['availableAssets','Savings and other available money','money'],
  ['inflationRate','Inflation rate','rate'],['investmentReturnRate','Investment return rate','rate']
 ];
+export const requiredProfileFields = ['mortgageBalance','otherDebt','finalExpenses','desiredAnnualIncome','incomeReplacementYears','collegeFundingNeed','existingLifeInsurance','availableAssets'];
 export function validateProfile(profile) {
  return profileFields.flatMap(([key,label,type]) => {
   const value = profile[key];
+  if(value==null&&!requiredProfileFields.includes(key))return [];
   if(type==='ages') return Array.isArray(value) && value.every(n=>Number.isInteger(n)&&n>=0&&n<=120) ? [] : [label];
   return typeof value==='number' && Number.isFinite(value) && value>=0 && (type!=='count'||(Number.isInteger(value)&&value<=120)) && (type!=='rate'||value<=1) ? [] : [label];
  });

@@ -40,6 +40,16 @@ def clean_context(value):
         raise ValueError("Invalid profile source.")
     if result["resultSource"] not in ("mock", "backend"):
         raise ValueError("Invalid result source.")
+    assessment = value.get("assessment")
+    if assessment is not None:
+        if not isinstance(assessment, dict) or not isinstance(assessment.get("active", False), bool):
+            raise ValueError("Invalid assessment state.")
+        result["assessment"] = {"active": assessment.get("active", False)}
+        field = assessment.get("field")
+        if field is not None:
+            if field not in FIELDS:
+                raise ValueError("Unknown assessment field.")
+            result["assessment"]["field"] = field
     calculation = value.get("result")
     preferences = value.get("preferences", {})
     if not isinstance(preferences, dict):
@@ -110,6 +120,13 @@ def capture_intake(message, profile, field):
     profile = clean_profile(profile)
     if field is not None and field not in FIELDS:
         raise ValueError("Unknown intake field.")
+    from AI_interact import RATE_FIELDS, RateInputError, conversational_rate_updates
+    try:
+        rate_updates = conversational_rate_updates(message, field)
+    except RateInputError as error:
+        return {"updates": {}, "reply": str(error)}
+    if field in RATE_FIELDS:
+        return {"updates": rate_updates, "reply": "Please confirm the details below before I add them to your plan."}
     prompt = (
         "Extract only facts explicitly stated in the user's latest message. Return ONLY a JSON object with "
         "updates (an object of changed LifeNeedsProfile fields) and help (a short plain-language explanation if the user asks a question or is unsure). "
@@ -130,7 +147,13 @@ def capture_intake(message, profile, field):
         if raw.startswith("```"):
             raw = re.sub(r"\A```(?:json)?\s*|\s*```\Z", "", raw)
         parsed = json.loads(raw)
-        updates = clean_profile(parsed.get("updates", parsed) if isinstance(parsed,dict) else parsed)
+        extracted = parsed.get("updates", parsed) if isinstance(parsed, dict) else parsed
+        if isinstance(extracted, dict):
+            extracted = dict(extracted)
+            for rate_field in RATE_FIELDS:
+                extracted.pop(rate_field, None)
+            extracted.update(rate_updates)
+        updates = clean_profile(extracted)
     except (ValueError, TypeError) as error:
         raise RuntimeError("I couldn't confidently read those details. Please rephrase your answer.") from error
     if not updates:

@@ -2,7 +2,8 @@
   "name": "codelinc-lifemap-workspace",
   "private": true,
   "scripts": {
-    "dev": "npm --prefix lifemap-ai-main run dev",
+    "start": "python3 app_server.py",
+    "dev": "python3 app_server.py",
     "api": "npm --prefix lifemap-ai-main run api",
     "test": "npm --prefix lifemap-ai-main test"
   }

@@ -2,21 +2,28 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends nodejs npm \
-    && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY package.json ./
-COPY AI_interact.py api_server.py back_end.py front_end.py ./
+# Include every root Python module: the API imports chat_features, learning,
+# calculator_bridge and auth_accounts, not just the original four files.
+COPY *.py ./
 COPY lifemap-ai-main ./lifemap-ai-main
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    LIFEMAP_API_HOST=0.0.0.0 \
-    LIFEMAP_OLLAMA_URL=http://host.docker.internal:11434/api/chat
+    HOST=0.0.0.0 \
+    PORT=5173 \
+    LIFEMAP_AUTH_DB_PATH=/data/accounts.sqlite3
 
-RUN pip install --no-cache-dir pydantic
+RUN useradd --create-home --uid 10001 lifemap \
+    && mkdir -p /data \
+    && chown lifemap:lifemap /data
 
-EXPOSE 5173 8000
+USER lifemap
+EXPOSE 5173
 
-CMD ["bash", "-lc", "npm run api & HOST=0.0.0.0 npm run dev"]
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "from urllib.request import urlopen; import os; urlopen('http://127.0.0.1:'+os.environ.get('PORT','5173')+'/api/health',timeout=3)"
+
+CMD ["python", "app_server.py"]

@@ -36,7 +36,7 @@ def calculate(profile):
         'assumptions': [
             'Calculated from your confirmed inputs by the team reference calculator; this is not Lincoln’s proprietary calculator or a policy quote.',
             f"Income support lasts {profile['incomeReplacementYears']} years at ${profile['desiredAnnualIncome']:,.0f} per year before the calculator's inflation/return adjustment.",
-            f"Inflation assumption: {profile.get('inflationRate', .02):.1%}; investment return assumption: {profile.get('investmentReturnRate', .05):.1%}. These are assumptions, not promised returns.",
+            f"Inflation assumption: {profile.get('inflationRate', .02):.6%}; investment return assumption: {profile.get('investmentReturnRate', .05):.6%}. These are assumptions, not promised returns.",
             'Existing insurance and available assets are counted separately from the additional coverage estimate.',
             'Annual salary and dependent count are context; this calculator uses your explicitly chosen income-support and education amounts rather than deriving them from salary or family size.',
         ],

@@ -7,7 +7,7 @@ import threading
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from AI_interact import API_request
+from AI_interact import chat_turn
 from chat_features import capture_intake, clean_context
 from calculator_bridge import calculate, simulate
 from learning import make_lesson
@@ -29,6 +29,7 @@ MAX_MESSAGE_LENGTH = 2000
 _requests = {}
 _rate_lock = threading.Lock()
 _ai_slots = threading.BoundedSemaphore(4)
+_auth_slots = threading.BoundedSemaphore(2)
 
 
 def allow_request(client, now=None):
@@ -59,6 +60,8 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
             self.send_header("Vary", "Origin")
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
 
@@ -71,18 +74,18 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", origin)
         self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.send_header("Access-Control-Max-Age", "600")
         self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_POST(self) -> None:
-        if self.path not in ("/api/chat", "/api/intake", "/api/calculate", "/api/scenario", "/api/lesson"):
+        if self.path not in ("/api/auth", "/api/chat", "/api/intake", "/api/calculate", "/api/scenario", "/api/lesson"):
             self._send_json(404, {"error": "Endpoint not found."})
             return
 
         origin = self.headers.get("Origin")
-        same_origin = origin == "https://" + self.headers.get("Host", "")
+        same_origin = origin in ("https://" + self.headers.get("Host", ""), "http://" + self.headers.get("Host", ""))
         if origin and origin not in ALLOWED_ORIGINS and not same_origin:
             self._send_json(403, {"error": "This browser origin is not allowed."})
             return
@@ -99,6 +102,22 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
 
         if not isinstance(payload, dict):
             self._send_json(400, {"error": "Request body must be a JSON object."})
+            return
+        if self.path == '/api/auth':
+            from auth_accounts import AccountError, account_request
+            client = self.headers.get('X-Vercel-Forwarded-For', self.client_address[0]) if os.environ.get('VERCEL') else self.client_address[0]
+            if not allow_request('auth:' + client) or not _auth_slots.acquire(blocking=False):
+                self._send_json(429, {'error': 'Too many account requests. Please wait a minute and try again.'})
+                return
+            try:
+                result = account_request(payload, self.headers.get('Authorization'))
+                self._send_json(200, result)
+            except AccountError as error:
+                self._send_json(error.status, {'error': str(error)})
+            except Exception:
+                self._send_json(503, {'error': 'Accounts are temporarily unavailable. Please try again.'})
+            finally:
+                _auth_slots.release()
             return
         if self.path in ("/api/calculate", "/api/scenario", "/api/lesson"):
             client = self.client_address[0]
@@ -126,6 +145,17 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
             return
         message = payload.get("message")
         conversation = payload.get("conversation", [])
+        if isinstance(message, str) and not message.strip():
+            from AI_interact import RATE_FIELDS, RateInputError, normalize_conversational_rate
+            raw_context = payload.get("context", {})
+            raw_state = raw_context.get("assessment", {}) if isinstance(raw_context, dict) else {}
+            field = payload.get("field") if self.path == "/api/intake" else raw_state.get("field") if isinstance(raw_state, dict) else None
+            if field in RATE_FIELDS:
+                try:
+                    normalize_conversational_rate(message)
+                except RateInputError as error:
+                    self._send_json(400, {"error": str(error)})
+                    return
         if not isinstance(message, str) or not message.strip() or len(message) > MAX_MESSAGE_LENGTH:
             self._send_json(400, {"error": "Please send between 1 and 2,000 characters."})
             return
@@ -145,7 +175,7 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
             if self.path == "/api/intake":
                 result = capture_intake(message, context["profile"], payload.get("field"))
             else:
-                result = {"reply": API_request(message, conversation, context)}
+                result = chat_turn(message, conversation, context)
             self._send_json(200, result)
         except ValueError as error:
             self._send_json(400, {"error": str(error)})

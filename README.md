@@ -6,7 +6,7 @@ LifeMap collects confirmed planning details through conversational intake and pr
 
 ## What works
 
-- An optional first-name welcome step personalizes greetings and offers a learn-first or plan-first choice. The name is stored only in sessionStorage for the current tab and is not sent to AI. No email, password, or authenticated account is created. End session and Clear my details remove it. Financial details still reset on reload.
+- Get Started opens real full-name, email, and password registration; existing users can log in. LifeMap's account backend uses persistent SQLite locally and requires a Postgres `DATABASE_URL` on Vercel. See [account setup](docs/account-setup.md). Passwords are hashed server-side and never sent to AI or stored in browser storage. Financial plans still reset on reload.
 
 - Profiles start empty. Intake extracts stated facts, including multiple fields and corrections, and proposes them for explicit confirmation before saving.
 - AI-generated mini-lessons cover protection, needs, term/permanent tradeoffs, future changes, and next steps. Each includes an example, a comprehension check, and personalized follow-up with the tutor. Users can learn before sharing details and switch into planning at any time.
@@ -14,18 +14,37 @@ LifeMap collects confirmed planning details through conversational intake and pr
 - All 14 fields in the existing shared contract are supported. Missing fields are asked one at a time. Review allows manual corrections; a complete synthetic sample is available as a separate shortcut.
 - Ask LifeMap receives the confirmed profile, recent conversation, calculator result, and its source. The team reference calculator is identified accurately, and an example profile is labeled when used.
 - Requests have a timeout, duplicate-send protection, progress indicators, and retry without adding the same message twice.
-- A short informational notice explains AI processing; chat sends immediately without a checkbox. Clear my details removes the in-tab profile and conversation. Reload also resets the session. No localStorage or saved financial account is used. Only the optional first name is kept in sessionStorage for the tab.
-- Server validation limits message length, conversation size, profile values, and request-body size. Provider errors and visitor addresses are excluded from application logs. Per-instance limits allow up to 20 requests per minute per client and four concurrent model requests. Distributed rate limiting is not provided by this in-memory guard; configure a hosting-edge rule before relying on a global limit.
+- A short informational notice explains AI processing; chat sends immediately without a checkbox. Clear my details removes the in-tab profile and conversation. Reload resets financial planning details. Account session tokens are stored in sessionStorage; End session signs out. Financial plans are not saved to an account.
+- Server validation limits message length, conversation size, profile values, and request-body size. Review and scenarios require the same eight calculator inputs; optional context can remain blank, with omitted rates using the existing 2% inflation / 5% return defaults. Provider errors and visitor addresses are excluded from application logs. Per-instance limits allow up to 20 requests per minute per client and four concurrent model requests. Distributed rate limiting is not provided by this in-memory guard; configure a hosting-edge rule before relying on a global limit.
 
 ## Local development
 
+Requires Python 3.12 or newer. From a fresh clone:
+
 ```sh
+git clone https://github.com/ArnavShergill/CodeLinc-11-2026-Project.git
+cd CodeLinc-11-2026-Project
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-npm run dev
+.venv/bin/python app_server.py
 ```
 
-In a second terminal, run `.venv/bin/python api_server.py`. Open http://127.0.0.1:5173. The local model defaults to Ollama at http://127.0.0.1:11434/api/chat with `gemma3:latest`. Set `LIFEMAP_OLLAMA_MODEL`, `LIFEMAP_OLLAMA_URL`, and optionally `OLLAMA_API_KEY` to use another running Ollama service. Browser configuration is in `lifemap-ai-main/config.js`; for fully local development set `chatApiUrl` to `http://127.0.0.1:8000/api/chat`.
+Open http://127.0.0.1:5173. One process serves the landing page, dashboard, account endpoints, calculator and AI routes, with dynamically generated same-origin browser configuration. No editing of `config.js`, Node installation, or second server is required. On Windows use `.venv\Scripts\python.exe` instead of `.venv/bin/python`.
+
+The calculator and local accounts work without an AI key. Live AI lessons and natural-language extraction require a running Ollama model or an Ollama Cloud key. Set `OLLAMA_API_KEY` in an ignored `.env.local` file or the server environment to select Ollama Cloud automatically. Without a cloud key, the default is Ollama at http://127.0.0.1:11434/api/chat with `gemma3:latest`; install and start that model separately. Explicit `LIFEMAP_OLLAMA_URL` and `LIFEMAP_OLLAMA_MODEL` override the defaults. Never commit an actual key.
+
+## Docker / judge submission
+
+In the submission form choose **Dockerfile** and set its path to **`Dockerfile`**. Remove the old prose from the command box. The application listens on **port 5173**. See [submission checklist](docs/docker-submission.md).
+
+```sh
+docker build -t lifemap-ai -f Dockerfile .
+docker run --rm -p 5173:5173 -v lifemap-accounts:/data lifemap-ai
+```
+
+Open http://localhost:5173. The named volume preserves local accounts across container replacement. Add `-e OLLAMA_API_KEY` to the run command if the key is already exported in your shell; secrets must be runtime settings, not image contents. A Linux host running Ollama can use `--add-host=host.docker.internal:host-gateway` with `-e LIFEMAP_OLLAMA_URL=http://host.docker.internal:11434/api/chat` and the desired model. Node is needed only for JavaScript tests, not to run the application.
+
+`.github/workflows/submission.yml` builds this Dockerfile, starts the actual container, verifies the website/API/calculator/scenarios/accounts, restarts it, and verifies persistent login again.
 
 ## Hosting
 
@@ -33,15 +52,16 @@ The shared repository's `.github/workflows/pages.yml` tests and publishes `lifem
 
 The Vercel deployment currently uses `Amos-Isaya/lifemap-ai-live`, a separate repository. Backend changes must reach that repository to deploy; pushing to the shared repository alone does not redeploy its AI service.
 
-[Deploy a new combined website/API to Vercel](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FArnavShergill%2FCodeLinc-11-2026-Project&env=OLLAMA_API_KEY&envLink=https%3A%2F%2Follama.com%2Fsettings%2Fkeys&project-name=lifemap-ai&repository-name=lifemap-ai). The root `vercel.json` and `scripts/build_vercel.py` build the static website with a same-origin `/api/chat` connection. Vercel defaults to Ollama Cloud and `gemma4:31b`. Enter only `OLLAMA_API_KEY` in Vercel; never commit it or place it in browser configuration. Model and service URL variables remain optional overrides. Production endpoints must be publicly accessible for GitHub Pages to call them.
+[Deploy a new combined website/API to Vercel](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FArnavShergill%2FCodeLinc-11-2026-Project&env=OLLAMA_API_KEY&envLink=https%3A%2F%2Follama.com%2Fsettings%2Fkeys&project-name=lifemap-ai&repository-name=lifemap-ai). The root `vercel.json` and `scripts/build_vercel.py` build the static website with same-origin API connections. Vercel defaults to Ollama Cloud and `gemma4:31b`. Set `OLLAMA_API_KEY` for AI and connect a Postgres `DATABASE_URL` for real hosted accounts; never commit these values or place them in browser configuration. Model and service URL variables remain optional overrides. Production endpoints must be publicly accessible for GitHub Pages to call them.
 
 Endpoints:
 
-- `POST /api/chat`: `{message, conversation, context: {profile, result?, resultSource}}` → `{reply}`.
+- `POST /api/chat`: `{message, conversation, context: {profile, result?, resultSource, assessment?}}` → `{reply, profile, assessment, mode, missingFields?, result?}`. Carry assessment state into the next request; see [assessment flow](docs/assessment-chat.md).
 - `POST /api/intake`: same body plus `field` (a contract field or null) → `{updates, reply}`. These updates are proposals; the browser commits them only after confirmation.
 - `POST /api/calculate`: `{profile}` → `{result}` from the team reference calculator.
 - `POST /api/scenario`: `{profile, scenario?, changes?, proposedCoverage?, policyYears?}` → calculator result, baseline, explicit changes, five timeline points and assumptions.
 - `POST /api/lesson`: `{topic, context}` → a validated AI-generated lesson with a comprehension question.
+- `POST /api/auth`: account `register`, `login`, `session`, and `logout` actions. Credentials go only to this endpoint; hosted accounts require Postgres.
 - `GET /api/health`: server liveness only, not model readiness.
 
 The GitHub Pages origin and local preview origins are allowed. Add other origins through comma-separated `LIFEMAP_ALLOWED_ORIGINS`. `PORT` or `LIFEMAP_API_PORT` controls the local bridge port.
@@ -81,4 +101,9 @@ Browser QA requires Playwright and Chrome:
 PLAYWRIGHT_MODULE_PATH=/path/to/playwright QA_STATIC_ROOT="$PWD/lifemap-ai-main" node lifemap-ai-main/tests/browser-check.cjs
 ```
 
-This serves local assets at the Pages origin and mocks API responses to check lessons, quizzes, confirmation, correction, retry, privacy, context, calculator input changes, scenario context, clearing, and all eight routes at desktop/tablet/mobile widths. It does not replace a live deployment smoke test.
+This serves local assets at the Pages origin and mocks API responses to check lessons, quizzes, confirmation, correction, retry, privacy, context, calculator input changes, scenario context, clearing, and all nine routes at desktop/tablet/mobile widths. It does not replace a live deployment smoke test.
+
+
+## Pre-submission audit
+
+See [the audit report](docs/pre-submission-audit.md) for formula traces, confirmed bugs, verification commands, and unresolved submission risks. Run the offline real-calculator browser audit with `AUDIT_PYTHON=/path/to/python PLAYWRIGHT_MODULE_PATH=/path/to/playwright node lifemap-ai-main/tests/audit-browser.cjs`. It starts an isolated Python HTTP server, uses synthetic profiles, and stubs only model generation. `python scripts/audit_secrets.py` checks the current local key against tracked files, built output, and reachable Git history without printing it.
