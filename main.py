@@ -1,7 +1,7 @@
 import front_end as fe
 
 def main():
-    fe.front_end()
+    pass
 
 if __name__ == "__main__":
     try:

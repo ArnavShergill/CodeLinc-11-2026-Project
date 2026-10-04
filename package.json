@@ -1,0 +1,9 @@
+{
+  "name": "codelinc-lifemap-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix lifemap-ai-main run dev",
+    "api": "npm --prefix lifemap-ai-main run api",
+    "test": "npm --prefix lifemap-ai-main test"
+  }
+}

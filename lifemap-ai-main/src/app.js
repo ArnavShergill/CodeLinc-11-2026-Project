@@ -1,0 +1,155 @@
+import {mockConversation} from './data/mockConversation.js';
+import {mockProfile} from './data/mockProfile.js';
+import {mockScenarios,mockTimeline} from './data/mockScenarios.js';
+import {profileFields,validateProfile} from './types/contracts.js';
+import {intakeQuestions,sendIntakeMessage,askLifeMap,calculatePlan,explainPlan} from './services/planService.js';
+const app=document.querySelector('#app');
+const money=n=>typeof n==='number'&&Number.isFinite(n)?new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n):'Not provided';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const state={profile:structuredClone(mockProfile),captured:[],messages:[],step:0,busy:false,result:null,explanation:'',error:'',scenario:null,learnTab:'basics',topic:null,advisorMessages:[],advisorBusy:false,advisorError:'',menu:false};
+const paths={home:'M3 10l9-7 9 7v10H6V10 M9 20v-7h6v7',plan:'M4 19V5 M4 19h16 M7 14l4-4 4 2 5-7',simulator:'M3 18V7l5-3 5 3 5-3 3 3v11l-8 3-5-3-5 3 M8 4v14 M13 7v14',shield:'M12 3l8 4v6c0 5-8 9-8 9S4 18 4 13V7l8-4 M8 12l3 3 5-6',chat:'M5 4h14a2 2 0 012 2v10a2 2 0 01-2 2H9l-5 3V6a2 2 0 012-2 M8 9h8 M8 13h5',book:'M12 5c-4-3-8-2-9-1v15c3-2 6-2 9 0 3-2 6-2 9 0V4c-2-1-6-2-9 1v14',users:'M9 11a3 3 0 100-6 3 3 0 000 6 M3 20v-3c0-5 12-5 12 0v3H3 M17 5a3 3 0 010 6 M18 14c3 0 4 2 4 6',money:'M4 4h16v16H4z M9 8h6 M9 16h6 M12 6v12 M15 9c-5-4-9 3-3 3s2 7-3 3',bulb:'M8 16c-6-6-2-13 4-13s10 7 4 13l-2 2h-4z M9 21h6 M12 6v6',settings:'M12 8a4 4 0 100 8 4 4 0 000-8 M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z',logout:'M10 4H4v16h6 M9 12h12 M17 8l4 4-4 4',heart:'M12 20S1 13 3 7c2-5 7-4 9 0 2-4 7-5 9 0 2 6-9 13-9 13',question:'M9 8c0-5 8-5 8 0 0 3-5 3-5 6 M12 18v1 M12 2a10 10 0 100 20 10 10 0 000-20',ring:'M8 7a6 6 0 100 12 6 6 0 000-12 M16 7a6 6 0 100 12 6 6 0 000-12',arrow:'M4 12h16 M14 6l6 6-6 6'};
+const icon=(name,cls='')=>`<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]||paths.shield}"/></svg>`;
+const nav=[['home','home','Home'],['results','plan','My Plan'],['simulator','simulator','Future Simulator'],['breakdown','shield','Coverage Breakdown'],['learn','chat','Ask LifeMap']];
+const brand=()=>`<a class="brand" href="#landing"><span class="logo">${icon('shield')}</span>LifeMap AI</a>`;
+const button=(label,route,cls='primary')=>`<a class="button ${cls}" href="#${route}">${label}${icon('arrow')}</a>`;
+const robot=()=>'<span class="robot" aria-hidden="true"><span class="robot-face">••</span></span>';
+const assistant=text=>`<div class="assistant-row">${robot()}<div class="message assistant">${esc(text)}</div></div>`;
+const format=(value,type)=>type==='money'?money(value):type==='rate'?`${(value*100).toFixed(0)}%`:type==='ages'?value.join(', '):value;
+function route(){return location.hash.slice(1)||'landing'}
+function heading(kicker,title,copy){return `<header class="page-heading"><p class="eyebrow">${kicker}</p><h1>${title}</h1><p>${copy}</p></header>`}
+function demo(){return '<div class="demo-note"><span class="status-dot"></span> Demo experience · Illustrative data · No live calculation</div>'}
+function landing(){return `<div class="landing landing-teal"><nav class="public-nav">${brand()}<div class="public-links"><button data-action="how">How It Works</button><a href="#features">Features</a><button data-action="faq">FAQ</button></div><div class="nav-actions"><a href="#home" class="login-link">Log In</a>${button('Get Started','home')}</div></nav><main><section class="hero"><div class="scenic-background" aria-hidden="true"></div><div class="protection-art"><img src="src/assets/protection-illustration.svg" alt="A protective shield around a home and heart, with family and policy symbols"><span class="protection-label">YOUR PEOPLE. YOUR FUTURE. YOUR PLAN.</span></div><div class="hero-copy"><p class="hero-pill"><span></span> A little clarity for life's big questions</p><h1>For the life you’re building.<br><em>And the people you love.</em></h1><p class="hero-sub">Understand your potential life insurance needs through a simple conversation. A clearer picture today. A little more peace of mind for tomorrow.</p><div class="hero-actions">${button('Build My Plan','home')}<button class="button secondary" data-action="watch"><span class="play-icon" aria-hidden="true">▷</span> See How It Works</button></div><p class="landing-reassurance">No sign-up. No pressure. Just a place to start.</p></div><section class="benefits" id="features" aria-label="LifeMap benefits"><article><span class="feature-icon">${icon('users')}</span><div><h3>Personalized to your life</h3><p>Your people. Your priorities. Your plan.</p></div></article><article><span class="feature-icon">${icon('shield')}</span><div><h3>Clarity at every step</h3><p>Understand the story behind the numbers.</p></div></article><article><span class="feature-icon">${icon('plan')}</span><div><h3>Ready for what’s next</h3><p>Explore how life's milestones change things.</p></div></article></section><div class="landing-bottom"><span>LifeMap AI · Planning with people in mind</span><span>Illustrative demo · No live calculation</span></div></section></main></div>`}
+function shell(content,r){const selected=['intake','review'].includes(r)?'results':r;return `<div class="app-shell"><aside class="sidebar ${state.menu?'open':''}">${brand()}<nav aria-label="Main navigation">${nav.map(([id,i,label])=>`<a href="#${id}" ${id===selected?'aria-current="page"':''}>${icon(i)}${label}</a>`).join('')}</nav><div class="sidebar-bottom"><button data-action="settings">${icon('settings')}Settings</button><a href="#landing">${icon('logout')}Log Out</a></div></aside><div class="workspace"><header class="app-topbar"><button class="menu-button" data-action="menu" aria-label="Toggle navigation" aria-expanded="${state.menu}">☰</button><div class="user"><span class="avatar">A</span><span>Amos</span><button data-action="profile" aria-label="Open Amos profile">⌄</button></div></header><main class="page page-${r}" id="main-content">${content}</main><footer class="app-footer">Demo experience · Illustrative data · No live calculation</footer></div></div>`}
+function home(){let h=new Date().getHours();return `${heading('',`Good ${h<12?'morning':h<18?'afternoon':'evening'}, Amos 👋`,"Let's understand what protection could look like for you and the people you care about.")}<div class="welcome-cards"><article class="welcome-card build"><span class="feature-icon blue">${icon('chat')}</span><h2>Build My Plan</h2><p>Answer a few simple questions to get your personalized plan.</p>${button('Start My Plan','intake')}</article><article class="welcome-card basics"><span class="feature-icon purple">${icon('book')}</span><h2>Learn the Basics</h2><p>Understand how life insurance works in a simple, easy way.</p>${button('Learn','learn','secondary')}</article></div><div class="or-divider"><span>or</span></div><form id="home-ask" class="ask-bar">${icon('chat')}<label class="sr-only" for="home-question">Ask about life insurance</label><input id="home-question" name="question" placeholder="Ask me anything about life insurance..." required><button class="send" aria-label="Ask LifeMap">${icon('arrow')}</button></form>`}
+function intake(){
+ const q=intakeQuestions[state.step];
+ const captured=state.captured.length
+  ?state.captured.map(key=>{let f=profileFields.find(f=>f[0]===key);return `<div class="captured-row"><small>${f[1]}</small><strong>${format(state.profile[key],f[2])}</strong></div>`}).join('')
+  :'<p>Your example details appear here as we go.</p>';
+ return `<div class="intake-grid"><section class="conversation"><div class="chat-header"><strong>Build My Plan</strong><small>${Math.min(state.step+1,4)} of 4 questions</small></div><div class="progress"><span style="width:${state.step/4*100}%"></span></div><div class="messages" aria-live="polite">${assistant(mockConversation.introduction)}${state.messages.map(m=>m.role==='customer'?`<div class="message customer">${esc(m.text)}</div>`:assistant(m.text)).join('')}${assistant(q?q[1]:mockConversation.complete)}${state.busy?assistant('Understanding your information…'):''}</div>${state.error?`<p class="error" role="alert">${esc(state.error)}</p>`:''}<div class="chat-input-area">${q?`<button class="chip" data-action="example" ${state.busy?'disabled':''}>Use example: ${q[2]}</button><form id="chat-form"><label class="sr-only" for="message">Your reply</label><input id="message" name="message" placeholder="Type your answer..." autocomplete="off" required ${state.busy?'disabled':''}><button class="send" aria-label="Send message" ${state.busy?'disabled':''}>${icon('arrow')}</button></form>`:button('Review My Information','review')}<p class="chat-disclaimer">AI replies are live; the profile still uses example values. Edit details in review.</p></div></section><aside class="captured"><h3>Your plan so far</h3>${captured}<a href="#review" class="text-link">Review example profile →</a></aside></div>`;
+}
+const fieldIcons={annualIncome:['money','green'],spouseAnnualIncome:['money','green'],numberOfDependents:['users','purple'],childrenAges:['users','purple'],mortgageBalance:['home','pink'],otherDebt:['money','green'],existingLifeInsurance:['shield','blue'],availableAssets:['bulb','orange']};
+function profileRow([key,label,type]){const [i,c]=fieldIcons[key]||['plan','orange'];return `<div class="profile-row"><span class="feature-icon ${c}">${icon(i)}</span><label for="${key}">${label}${type==='rate'?' (%)':''}</label><div class="review-value"><span class="formatted-value">${esc(format(state.profile[key],type))}</span><input class="profile-input" id="${key}" name="${key}" aria-label="${label}" type="${type==='ages'?'text':'number'}" value="${type==='rate'?state.profile[key]*100:type==='ages'?state.profile[key].join(', '):state.profile[key]}" ${type==='ages'?'placeholder="7, 11"':`min="0" ${type==='rate'?'max="100" step="0.01"':'step="1"'}`} ${type==='ages'?'':'required'}></div><button type="button" class="edit-button" data-edit="${key}">Edit</button></div>`}
+function review(){const keys=['annualIncome','numberOfDependents','mortgageBalance','otherDebt','existingLifeInsurance','availableAssets'];return `${heading('','Review Your Information',"Here's what we've gathered. You can edit anything before we calculate your plan.")}<form id="profile-form" class="profile-card"><div class="review-rows">${keys.map(k=>profileRow(profileFields.find(f=>f[0]===k))).join('')}</div><details class="advanced-profile"><summary>More profile details & assumptions</summary>${profileFields.filter(f=>!keys.includes(f[0])).map(profileRow).join('')}</details><p class="review-demo">Synthetic development profile. Changes do not alter the fixed sample result.</p><p class="error" id="profile-error" role="alert">${esc(state.error)}</p><div class="form-actions"><a class="button secondary" href="#intake">← Back</a><button class="button primary" ${state.busy?'disabled':''}>${state.busy?'Calculating your protection needs…':'Calculate My Plan'} ${icon('arrow')}</button></div></form>`}
+function noResult(){return `${heading('YOUR PROTECTION PLAN','Let’s start with your story.','Review your information to see the demonstration result and its breakdown.')}<div class="card empty-state"><span class="feature-icon">◈</span><h2>A little context comes first.</h2><p>Build your example profile, then explore what a clear protection plan can look like.</p>${button('Build my plan','intake')}${button('Review example profile','review','secondary')}</div>`}
+function results(){if(!state.result)return noResult();return `${heading('','Your Protection Plan',"Based on the information you provided, here's your estimated life insurance need.")}<div class="result-hero"><span class="result-shield">${icon('shield')}</span><div><h2>Estimated Coverage Needed</h2><div class="big-number">${money(state.result.additionalCoverageNeeded)}</div><p>This is the estimated amount to help protect your family's financial future.</p></div></div><div class="context-grid">${[['annualIncome','Annual income'],['numberOfDependents','Dependents'],['mortgageBalance','Mortgage'],['existingLifeInsurance','Existing coverage']].map(([k,l])=>{const [i,c]=fieldIcons[k];return `<div class="context-item"><span class="feature-icon ${c}">${icon(i)}</span><strong>${k==='numberOfDependents'?state.profile[k]:money(state.profile[k])}</strong><small>${l}</small></div>`}).join('')}</div><section class="explanation"><span class="feature-icon orange">${icon('bulb')}</span><div><h3>Why this amount?</h3><p>${esc(state.explanation||'Preparing your explanation…')}</p></div></section><div class="result-actions">${button('See Full Breakdown','breakdown','secondary')}${button('Explore Future Simulator','simulator')}</div>${demo()}`}
+function breakdown(){if(!state.result)return noResult();let r=state.result;return `${heading('','How We Calculated This',"Here's a simple breakdown of your estimated needs.")}<section class="breakdown-card">${(r.breakdown||[]).map((b,i)=>`<div class="breakdown-row"><span class="feature-icon ${['green','pink','orange','purple','purple'][i%5]}">${icon(['money','home','shield','book','money'][i%5])}</span><div>${esc(b.label||'Unlabeled item')}</div><strong>${money(b.amount)}</strong></div>`).join('')}<div class="need-subtotals"><span>Immediate needs <b>${money(r.immediateNeeds)}</b></span><span>Long-term needs <b>${money(r.longTermNeeds)}</b></span></div><div class="breakdown-row total"><span class="feature-icon orange">${icon('bulb')}</span><div>Total Needs</div><strong>${money(r.totalNeeds)}</strong></div><div class="breakdown-row resources"><span class="feature-icon orange">${icon('money')}</span><div>Less existing resources<small>(existing life insurance + assets)</small></div><strong>− ${money(r.availableResources)}</strong></div><div class="breakdown-row final-total"><div>Additional Coverage Needed</div><strong>${money(r.additionalCoverageNeeded)}</strong></div></section><div class="info-box">${icon('shield')}<p>These numbers are estimates based on the information provided. You can adjust your information or try different scenarios in the Future Simulator.</p></div><details class="assumptions"><summary>View demonstration assumptions</summary><ul>${(r.assumptions||[]).map(a=>`<li>${esc(a)}</li>`).join('')}</ul></details><a href="#simulator" class="text-link">Try a life scenario →</a>${demo()}`}
+function chart(values){const xs=[50,180,310,440,570],ys=values.map(v=>220-v/900000*190);let pts=xs.map((x,i)=>`${x},${ys[i]}`).join(' ');return `<svg viewBox="0 0 620 270" role="img" aria-label="Illustrative coverage over time: ${values.map((v,i)=>`${i*5} years ${money(v)}`).join(', ')}">${[0,300000,600000,900000].map(v=>`<line x1="50" x2="570" y1="${220-v/900000*190}" y2="${220-v/900000*190}" class="gridline"/><text x="0" y="${224-v/900000*190}" class="chart-label">${v?'$'+v/1000+'k':'$0'}</text>`).join('')}<polygon points="50,220 ${pts} 570,220" fill="url(#area)"/><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#0866f5" stop-opacity=".24"/><stop offset="1" stop-color="#0866f5" stop-opacity=".01"/></linearGradient></defs><polyline points="${pts}" fill="none" stroke="#0866f5" stroke-width="3"/>${xs.map((x,i)=>`<g class="chart-point" tabindex="0" role="button" aria-label="${i===0?'Today':'In '+i*5+' years'}: ${money(values[i])}" data-point="${i}"><circle cx="${x}" cy="${ys[i]}" r="12" fill="transparent"/><circle cx="${x}" cy="${ys[i]}" r="5" fill="#0866f5"/><g class="chart-tooltip" transform="translate(${Math.min(x,480)},${Math.max(ys[i]-68,5)})"><rect x="-40" width="120" height="55" rx="7" fill="white" stroke="#dce7f5"/><text x="-30" y="20">${i===0?'Today':'In '+i*5+' years'}</text><text x="-30" y="42" class="tooltip-value">${money(values[i])}</text></g></g><text x="${x}" y="250" text-anchor="middle" class="chart-label">${i===0?'Today':i*5+' years'}</text>`).join('')}</svg>`}
+function simulator(){let s=mockScenarios.find(s=>s.id===state.scenario);return `${heading('','How Your Needs Change Over Time','See how your estimated protection needs may change as life events happen.')}<div class="chart-card">${chart(s?s.timeline:mockTimeline)}</div><div class="info-box decrease">${icon('shield')}<div><h3>Why does it decrease?</h3><p>As time passes, your mortgage may get smaller, your children grow older, and there may be fewer years of income your family would need to replace.</p></div></div><div class="section-title scenario-title"><div><h2>Try a what-if scenario</h2><p>See how different life events can change your needs.</p></div>${s?'<button class="text-button" data-action="reset-scenario">Reset scenario ↶</button>':''}</div><div class="scenario-grid">${mockScenarios.map((s,i)=>`<button class="scenario ${s.id===state.scenario?'selected':''}" data-scenario="${s.id}" aria-pressed="${s.id===state.scenario}">${icon(['users','home','plan','money','ring'][i])}${s.label}</button>`).join('')}</div><div aria-live="polite">${s?`<section class="scenario-comparison"><div><p>CURRENT EXAMPLE</p><strong>${money(mockTimeline[0])}</strong></div><span class="comparison-arrow">→</span><div><p>${esc(s.label).toUpperCase()}</p><strong>${money(s.after)}</strong><span class="difference">${s.difference}</span></div><p>${s.copy}<small>Fixed sample comparison; no financial calculation is run.</small></p></section>`:''}</div>${demo()}`}
+const topics=[['What is life insurance?','Life insurance can provide money to beneficiaries when an insured person dies, subject to the policy’s terms. It can help with expenses and financial responsibilities.'],['Term vs. whole life','Term covers a specified period. Permanent policies are designed for longer coverage and may include cash value. Costs and conditions vary by policy.'],['How much do I need?','Dependents, income needs, debt, education goals, existing insurance and available assets can all shape the conversation.'],['Common life events','Marriage, a child, a new home and changes in income are useful moments to revisit your protection.'],['Frequently asked questions','This is an educational demo, not an insurance quote. A licensed professional can help you understand products and policy terms.']];
+const topicDescriptions=['A simple explanation and why it matters.','Key differences in plain language.','Factors that affect your coverage amount.','Marriage, children, buying a home, and more.','Quick answers to common questions.'];
+function learn(){
+ const content=state.learnTab==='basics'
+  ?`<section class="topics">${topics.map(([title,copy],i)=>`<details><summary><span class="feature-icon ${['purple','green','orange','pink','blue'][i]}">${icon(['shield','shield','bulb','heart','question'][i])}</span><div><strong>${title}</strong><small>${topicDescriptions[i]}</small></div><span class="detail-plus">›</span></summary><p>${copy}</p></details>`).join('')}</section>`
+  :`<section class="advisor"><div class="advisor-messages">${state.advisorMessages.length?state.advisorMessages.map(m=>m.role==='customer'?`<div class="message customer">${esc(m.text)}</div>`:assistant(m.text)).join(''):assistant('Hi Amos! What would you like to know about life insurance?')}${state.advisorBusy?assistant('Thinking…'):''}</div>${state.advisorError?`<p class="error" role="alert">${esc(state.advisorError)}</p>`:''}<div class="topic-chips">${topics.map(([title])=>`<button class="chip" type="button" data-ask-topic="${esc(title)}">${esc(title)}</button>`).join('')}</div><form id="advisor-form" class="ask-bar"><label class="sr-only" for="advisor-question">Your question</label><input id="advisor-question" name="question" placeholder="Ask a question about life insurance..." required ${state.advisorBusy?'disabled':''}><button class="send" aria-label="Send question" ${state.advisorBusy?'disabled':''}>${icon('arrow')}</button></form><p class="quiet">AI answers are generated by your local Ollama model.</p></section>`;
+ return `<div class="tabs" role="group" aria-label="Learning mode"><button data-tab="basics" aria-pressed="${state.learnTab==='basics'}">Learn the Basics</button><button data-tab="ask" aria-pressed="${state.learnTab==='ask'}">Ask a Question</button></div>${content}`;
+}
+function showDialog(title,copy){document.querySelector('dialog')?.remove();const d=document.createElement('dialog');d.innerHTML=`<form method="dialog"><button class="dialog-close" aria-label="Close">×</button><h2>${title}</h2><p>${copy}</p><button class="button primary">Got it</button></form>`;app.append(d);d.showModal();}
+function render(){let r=route();if(['features'].includes(r)){app.innerHTML=landing();document.getElementById(r)?.scrollIntoView();return;}let pages={home,intake,review,results,breakdown,simulator,learn};app.innerHTML=r==='landing'?landing():shell((pages[r]||(()=>heading('PAGE NOT FOUND','Let’s get you back on track.',button('Go home','home'))))(),r);document.title=`LifeMap — ${nav.find(n=>n[0]===r)?.[2]||'Your next chapter'}`;if(r==='intake'){let m=document.querySelector('.messages');m.scrollTop=m.scrollHeight;}}
+window.addEventListener('hashchange',()=>{state.menu=false;state.error='';render();if(route()!=='features')window.scrollTo(0,0)});
+async function askAdvisor(message){
+ if(state.advisorBusy)return;
+ state.learnTab='ask';
+ state.topic=null;
+ state.advisorError='';
+ state.advisorMessages.push({role:'customer',text:message});
+ state.advisorBusy=true;
+ if(route()!=='learn')location.hash='learn';
+ else render();
+ try{
+  const reply=await askLifeMap(message,state.advisorMessages);
+  state.advisorMessages.push({role:'assistant',text:reply});
+ }catch(error){
+  state.advisorError=error.message;
+ }finally{
+  state.advisorBusy=false;
+  render();
+ }
+}
+async function send(message){
+ if(state.busy||state.step>=intakeQuestions.length)return;
+ state.busy=true;
+ state.error='';
+ state.messages.push({role:'customer',text:message});
+ render();
+ try{
+  const response=await sendIntakeMessage({
+   profile:state.profile,
+   questionIndex:state.step,
+   message,
+   conversation:[
+    ...state.messages.slice(0,-1),
+    {role:'assistant',text:intakeQuestions[state.step][1]},
+    state.messages[state.messages.length-1]
+   ]
+  });
+  state.profile=response.profile;
+  state.captured.push(intakeQuestions[state.step][0]);
+  state.messages.push({role:'assistant',text:response.reply});
+  state.step++;
+ }catch(error){
+  state.error=error.message;
+ }finally{
+  state.busy=false;
+  render();
+ }
+}
+app.addEventListener('click',e=>{const point=e.target.closest('[data-point]');if(point){point.classList.toggle('point-selected');return;}const b=e.target.closest('button');if(!b)return;if(b.dataset.edit){const row=b.closest('.profile-row');row.classList.toggle('editing');const input=row.querySelector('input');if(row.classList.contains('editing')){b.textContent='Done';input.focus();}else{const field=profileFields.find(f=>f[0]===b.dataset.edit);const raw=input.value.trim();const value=field[2]==='ages'?(raw?raw.split(',').map(Number):[]):field[2]==='rate'?Number(raw)/100:Number(raw);row.querySelector('.formatted-value').textContent=format(value,field[2]);b.textContent='Edit';}return;}if(['how','watch'].includes(b.dataset.action))showDialog('How it works','Start your plan, answer four guided demo questions, review your profile, then explore an illustrative result and life scenarios. No sign-up needed.');if(b.dataset.action==='faq')showDialog('Frequently asked questions','This is a hackathon demo, not an insurance quote. Login is a demo interaction. Profile edits are supported, while results remain fixed illustrative data.');if(b.dataset.action==='settings')showDialog('Demo settings','This experience uses synthetic data and resets when you reload. No account or information is stored.');if(b.dataset.action==='profile')showDialog('Amos · Demo profile','You are exploring LifeMap AI as Amos. Authentication is not connected for this demo.');if(b.dataset.action==='menu'){state.menu=!state.menu;render();}if(b.dataset.action==='example')send(intakeQuestions[state.step][2]);if(b.dataset.scenario){state.scenario=b.dataset.scenario;render();}if(b.dataset.action==='reset-scenario'){state.scenario=null;render();}if(b.dataset.tab){state.learnTab=b.dataset.tab;render();}if(b.dataset.topic){state.topic=Number(b.dataset.topic);state.advisorQuestion=topics[state.topic][0];render();}});
+app.addEventListener('click',e=>{
+ const topic=e.target.closest('[data-ask-topic]');
+ if(topic)askAdvisor(topic.dataset.askTopic);
+});
+app.addEventListener('submit',async e=>{
+ if(e.target.getAttribute('method')==='dialog')return;
+ e.preventDefault();
+ if(['home-ask','advisor-form'].includes(e.target.id)){
+  askAdvisor(new FormData(e.target).get('question').trim());
+  return;
+ }
+ if(e.target.id==='chat-form'){
+  send(new FormData(e.target).get('message').trim());
+  return;
+ }
+ if(e.target.id!=='profile-form'||state.busy)return;
+ const data=new FormData(e.target),profile={};
+ for(const [key,,type] of profileFields){
+  let raw=data.get(key).trim();
+  profile[key]=type==='ages'
+   ?(raw?raw.split(',').map(n=>n.trim()?Number(n):NaN):[])
+   :type==='rate'?Number(raw)/100:raw?Number(raw):NaN;
+ }
+ const errors=validateProfile(profile);
+ if(errors.length){
+  state.error=`Please review the highlighted information: ${errors.join(', ')}.`;
+  document.querySelector('#profile-error').textContent=state.error;
+  for(const [key,label] of profileFields){
+   document.getElementById(key).setAttribute('aria-invalid',String(errors.includes(label)));
+   if(errors.includes(label)){
+    const details=document.getElementById(key).closest('details');
+    if(details)details.open=true;
+   }
+  }
+  return;
+ }
+ state.profile=profile;
+ state.error='';
+ state.busy=true;
+ render();
+ try{
+  const response=await calculatePlan(profile);
+  state.result=response.result;
+  state.busy=false;
+  location.hash='results';
+  render();
+  state.explanation=await explainPlan(state.result);
+  if(route()==='results')render();
+ }catch(error){
+  state.error='We couldn’t calculate your plan right now. Please try again. '+error.message;
+ }finally{
+  state.busy=false;
+  if(route()==='review')render();
+ }
+});
+render();
+
+app.addEventListener('keydown',e=>{const point=e.target.closest('[data-point]');if(point&&['Enter',' '].includes(e.key)){e.preventDefault();point.classList.toggle('point-selected');}});

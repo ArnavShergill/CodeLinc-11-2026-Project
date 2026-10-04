@@ -1,0 +1,2 @@
+// Exact synthetic development fixture from the team contract. Not customer data.
+export const mockProfile = Object.freeze({annualIncome:75000,spouseAnnualIncome:45000,numberOfDependents:3,childrenAges:[7,11],mortgageBalance:180000,otherDebt:25000,finalExpenses:15000,desiredAnnualIncome:50000,incomeReplacementYears:10,collegeFundingNeed:80000,existingLifeInsurance:100000,availableAssets:50000,inflationRate:0.02,investmentReturnRate:0.05});
