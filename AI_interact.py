@@ -5,6 +5,7 @@ import re
 from typing import Any, Dict, List, Optional
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
@@ -209,7 +210,7 @@ def _extract_direct_answer(
 
 def _chat(messages: List[dict], *, json_mode: bool = False) -> str:
     chat_options = {"model": OLLAMA_MODEL, "messages": messages, "stream": False}
-    if json_mode:
+    if json_mode and urlparse(OLLAMA_URL).hostname != "ollama.com":
         chat_options["format"] = "json"
     headers = {"Content-Type": "application/json"}
     if os.environ.get("OLLAMA_API_KEY"):

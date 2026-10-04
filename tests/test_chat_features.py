@@ -1,6 +1,7 @@
 import io
 import json
 import unittest
+import AI_interact
 from unittest.mock import patch
 from chat_features import clean_profile, clean_context, capture_intake
 from api_server import LifeMapAPIHandler, allow_request, _requests
@@ -24,6 +25,17 @@ class ChatTests(unittest.TestCase):
     def test_invalid_extraction_never_becomes_a_fact(self):
         with patch('chat_features._chat', return_value='{"annualIncome":-100}'):
             with self.assertRaises(RuntimeError): capture_intake('hello', {}, 'annualIncome')
+
+    def test_cloud_requests_omit_unsupported_structured_output_flag(self):
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self): return b'{"message":{"content":"{}"}}'
+        with patch.object(AI_interact, 'OLLAMA_URL', 'https://ollama.com/api/chat'), patch.object(AI_interact, 'urlopen', return_value=Response()) as request:
+            self.assertEqual(AI_interact._chat([], json_mode=True), '{}')
+            self.assertNotIn('format', json.loads(request.call_args.args[0].data))
+        with patch('chat_features._chat', return_value='```json\n{"annualIncome":90000}\n```'):
+            self.assertEqual(capture_intake('90k', {}, 'annualIncome')['updates'], {'annualIncome':90000})
 
     def test_context_preserves_calculator_source(self):
         self.assertEqual(clean_context({'profile': {'annualIncome': 90000}, 'resultSource': 'mock'})['resultSource'], 'mock')

@@ -1,6 +1,7 @@
 """Chat boundaries: capture facts and explain results; calculator owns all math."""
 import json
 import math
+import re
 from AI_interact import LifeNeedsProfile, _chat
 
 FIELDS = set(LifeNeedsProfile.model_fields)
@@ -79,6 +80,9 @@ def capture_intake(message, profile, field):
         {"role": "user", "content": json.dumps({"currentField": field, "confirmedProfile": profile, "latestMessage": message})},
     ], json_mode=True)
     try:
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"\A```(?:json)?\s*|\s*```\Z", "", raw)
         updates = clean_profile(json.loads(raw))
     except (ValueError, TypeError) as error:
         raise RuntimeError("I couldn't confidently read those details. Please rephrase your answer.") from error
