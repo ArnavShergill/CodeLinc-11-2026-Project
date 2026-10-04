@@ -1,5 +1,6 @@
 """Judge-style HTTP smoke test. Standard library only; synthetic data only."""
 import json
+from http.client import RemoteDisconnected
 from pathlib import Path
 import re
 import secrets
@@ -7,6 +8,18 @@ import sys
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+
+def wait_for_health(probe, attempts=30):
+    """Docker may publish its port before Python finishes importing modules."""
+    for attempt in range(attempts):
+        try:
+            assert probe()['status'] == 'ok'
+            return
+        except (URLError, OSError, RemoteDisconnected):
+            if attempt == attempts - 1:
+                raise
+            time.sleep(1)
 
 
 def verify(base, account_file=None):
@@ -22,15 +35,7 @@ def verify(base, account_file=None):
         with urlopen(req, timeout=20) as response:
             return response.read().decode(), response.headers
 
-    for attempt in range(30):
-        try:
-            body, _ = request('/api/health')
-            assert json.loads(body)['status'] == 'ok'
-            break
-        except (URLError, TimeoutError):
-            if attempt == 29:
-                raise
-            time.sleep(1)
+    wait_for_health(lambda: json.loads(request('/api/health')[0]))
     html, _ = request('/')
     assert 'LifeMap AI' in html
     for asset in re.findall(r'(?:src|href)="([^"#]+)"', html):
