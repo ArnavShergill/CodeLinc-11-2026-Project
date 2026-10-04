@@ -5,6 +5,8 @@ import {mockConversation} from '../data/mockConversation.js';
 export const intakeQuestions = mockConversation.questions;
 const delay = () => new Promise(resolve=>setTimeout(resolve,350));
 const API_URL = 'http://127.0.0.1:8000/api/chat';
+const isHostedDemo = typeof window !== 'undefined' &&
+ !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 
 const FALLBACK_PATTERNS = [
  /Could not reach Ollama/i,
@@ -37,6 +39,10 @@ function fallbackReply(message='') {
 
 export async function askLifeMap(message,conversation=[]) {
  if(!message.trim()) throw new Error('Please add a message before sending.');
+ if(isHostedDemo) {
+  return fallbackReply(message).replace(/because the local Ollama service is unavailable(?: right now)?/, 'on this hosted website')
+   .replace('and starting Ollama with the gemma3:latest model will restore live answers.', 'with illustrative answers rather than live AI.');
+ }
  let response;
  try {
   response=await fetch(API_URL,{

@@ -1,5 +1,13 @@
 # LifeMap frontend
 
+Website: [LifeMap demo](https://arnavshergill.github.io/CodeLinc-11-2026-Project/).
+
+## GitHub Pages
+
+The `Deploy LifeMap to GitHub Pages` workflow tests and publishes the frontend on every push to `main`. In repository **Settings → Pages**, select **GitHub Actions** as the source. The frontend uses relative asset paths and hash routes so all screens work under the repository URL.
+
+The hosted site runs the sample plan, scenarios, and demo assistant. GitHub Pages cannot run the Python/Ollama backend; live AI remains available when running the app locally as described below.
+
 Eight-screen LifeMap customer demo with a unified deep teal, warm ivory and blue visual identity for 0x11 / codeLinc 11. The browser app uses a small local Python bridge for AI chat; profile values, plan calculations and explanations remain demo fixtures.
 
 ## Run

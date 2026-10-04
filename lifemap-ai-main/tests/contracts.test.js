@@ -55,3 +55,17 @@ test('unavailable Python API falls back to the demo assistant',async()=>{
  }
 });
 test('invalid profile is rejected by adapter',async()=>{await assert.rejects(calculatePlan({...mockProfile,mortgageBalance:-10}),/Mortgage balance/)});
+test('hosted demo answers without requesting a visitor local API',async()=>{
+ const originalFetch=globalThis.fetch;
+ globalThis.window={location:{hostname:'arnavshergill.github.io'}};
+ globalThis.fetch=()=>{assert.fail('Hosted demo must not request localhost');};
+ try{
+  const hosted=await import('../src/services/planService.js?hosted-test');
+  assert.match(await hosted.askLifeMap('Hello'),/hosted website/);
+  assert.match(await hosted.askLifeMap('My income is $75000'),/hosted website/);
+  await assert.rejects(hosted.askLifeMap(' '),/Please add a message/);
+ }finally{
+  globalThis.fetch=originalFetch;
+  delete globalThis.window;
+ }
+});
