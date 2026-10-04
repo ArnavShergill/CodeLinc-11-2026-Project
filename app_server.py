@@ -10,7 +10,7 @@ def load_local_environment():
     path = ROOT / '.env.local'
     if path.exists():
         allowed = {'OLLAMA_API_KEY', 'LIFEMAP_OLLAMA_URL', 'LIFEMAP_OLLAMA_MODEL',
-                   'DATABASE_URL', 'POSTGRES_URL', 'LIFEMAP_AUTH_DB_PATH', 'LIFEMAP_ALLOWED_ORIGINS'}
+                   'LIFEMAP_ALLOWED_ORIGINS'}
         for line in path.read_text().splitlines():
             key, separator, value = line.partition('=')
             if separator and key.strip() in allowed:
@@ -40,7 +40,7 @@ class LifeMapAppHandler(LifeMapAPIHandler, SimpleHTTPRequestHandler):
             body = (
                 "window.LIFEMAP_CONFIG = {};\n"
                 "for (const [key, route] of [['chatApiUrl','chat'],['calculateApiUrl','calculate'],"
-                "['scenarioApiUrl','scenario'],['authApiUrl','auth']]) {\n"
+                "['scenarioApiUrl','scenario']]) {\n"
                 " window.LIFEMAP_CONFIG[key] = window.location.origin + '/api/' + route;\n}\n"
             ).encode()
             self.send_response(200)

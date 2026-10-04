@@ -18,7 +18,7 @@ class SubmissionSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary);(root/'scripts').mkdir();(root/'lifemap-ai-main/src').mkdir(parents=True)
             shutil.copy2(ROOT/'scripts/build_vercel.py',root/'scripts/build_vercel.py')
-            (root/'lifemap-ai-main/config.js').write_text("window.LIFEMAP_CONFIG={chatApiUrl:'https://lifemap-ai-live.vercel.app/api/chat',calculateApiUrl:'https://lifemap-ai-live.vercel.app/api/calculate',scenarioApiUrl:'https://lifemap-ai-live.vercel.app/api/scenario',supabaseUrl:'https://public.example.test'};")
+            (root/'lifemap-ai-main/config.js').write_text("window.LIFEMAP_CONFIG={chatApiUrl:'https://lifemap-ai-live.vercel.app/api/chat',calculateApiUrl:'https://lifemap-ai-live.vercel.app/api/calculate',scenarioApiUrl:'https://lifemap-ai-live.vercel.app/api/scenario',customLabel:'test'};")
             (root/'lifemap-ai-main/index.html').write_text('Synthetic build fixture')
             (root/'lifemap-ai-main/src/.env.local').write_text('SYNTHETIC_SECRET=not-a-real-key')
             (root/'lifemap-ai-main/src/.lifemap-data').mkdir()
@@ -29,7 +29,7 @@ class SubmissionSafetyTests(unittest.TestCase):
             self.assertFalse(list((root/'public').rglob('.env*')))
             self.assertFalse(list((root/'public').rglob('*.sqlite3')))
             config=(root/'public/config.js').read_text()
-            self.assertIn('supabaseUrl',config)
+            self.assertIn('customLabel',config)
             self.assertIn("window.location.origin + '/api/chat'",config)
 
 if __name__=='__main__':unittest.main()

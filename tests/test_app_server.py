@@ -14,21 +14,18 @@ from scripts.smoke_submission import verify
 
 
 class AppServerTests(unittest.TestCase):
-    def test_complete_submission_smoke_and_persistent_account(self):
-        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
-            'DATABASE_URL': '', 'POSTGRES_URL': '', 'VERCEL': '', 'LIFEMAP_AUTH_REQUIRE_POSTGRES': '',
-            'LIFEMAP_AUTH_DB_PATH': str(Path(temporary) / 'accounts.sqlite3')}):
+    def test_complete_submission_smoke(self):
+        with tempfile.TemporaryDirectory() as temporary:
             from api_server import _requests
             _requests.clear()
             server = ThreadingHTTPServer(('127.0.0.1', 0), LifeMapAppHandler)
             worker = threading.Thread(target=server.serve_forever, daemon=True)
             worker.start()
             base = 'http://127.0.0.1:' + str(server.server_port)
-            account_file = str(Path(temporary) / 'synthetic-account.json')
             try:
-                verify(base, account_file)
+                verify(base)
                 _requests.clear()
-                verify(base, account_file)
+                verify(base)
             finally:
                 server.shutdown(); server.server_close(); worker.join()
                 _requests.clear()

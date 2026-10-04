@@ -13,12 +13,7 @@ const referenceResult=require('./fixtures/reference-result.json');
    const relative=new URL(route.request().url()).pathname.replace('/CodeLinc-11-2026-Project/','')||'index.html';
    return route.fulfill({path:path.join(process.env.QA_STATIC_ROOT,relative)});
   });
-  await page.route('**/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.LIFEMAP_CONFIG={chatApiUrl:'https://lifemap-ai-live.vercel.app/api/chat',calculateApiUrl:'https://lifemap-ai-live.vercel.app/api/calculate',scenarioApiUrl:'https://lifemap-ai-live.vercel.app/api/scenario',supabaseUrl:'https://accounts.example.test',supabasePublishableKey:'test-public-key'};`}));
-  const testUser={id:'test-user',user_metadata:{full_name:'Jordan Taylor'}};
-  await page.route('https://accounts.example.test/auth/v1/**',route=>{
-   if(route.request().url().endsWith('/signup')){const body=route.request().postDataJSON();assert.equal(body.data.full_name,'Jordan Taylor');assert.equal(body.email,'jordan@example.test');}
-   return route.fulfill({json:route.request().url().endsWith('/user')?testUser:{access_token:'test-session-token',expires_in:3600,user:testUser}});
-  });
+  await page.route('**/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.LIFEMAP_CONFIG={chatApiUrl:'https://lifemap-ai-live.vercel.app/api/chat',calculateApiUrl:'https://lifemap-ai-live.vercel.app/api/calculate',scenarioApiUrl:'https://lifemap-ai-live.vercel.app/api/scenario'};`}));
   let failNext=false,intakeCalls=0,advisorCalls=0,lastAdvisor,calculationCalls=0,scenarioCalls=0,lessonCalls=0;
   await page.route('**/api/intake',async route=>{
    intakeCalls++;const body=route.request().postDataJSON();
@@ -50,10 +45,9 @@ const referenceResult=require('./fixtures/reference-result.json');
   });
   await page.goto(process.env.QA_BASE_URL||(process.env.QA_STATIC_ROOT?'https://arnavshergill.github.io/CodeLinc-11-2026-Project/':'http://127.0.0.1:5173'));
   const go=async route=>{await page.evaluate(r=>location.hash=r,route);await page.waitForTimeout(150);};
-  await go('welcome');await page.locator('#full-name').fill('Jordan Taylor');await page.locator('#account-email').fill('jordan@example.test');await page.locator('#account-password').fill('Test-Password-123');await page.getByRole('button',{name:'Create account',exact:true}).click();
-  await page.locator('.user').getByText('Jordan',{exact:true}).waitFor();
-  await go('home');await page.getByRole('heading',{name:'Welcome, Jordan',exact:true}).waitFor();
-  await page.reload();await page.getByRole('heading',{name:'Welcome, Jordan',exact:true}).waitFor();
+  await page.getByRole('link',{name:'Get Started',exact:true}).click();await page.getByRole('heading',{name:'Welcome to LifeMap',exact:true}).waitFor();
+  assert.equal(await page.locator('input[type=password]').count(),0);
+  await go('welcome');await page.waitForURL('**#home');
   await go('learn');await page.getByRole('button',{name:'Start my first lesson'}).click();
   await page.getByRole('heading',{name:'Who life insurance helps',exact:true}).waitFor();
   await page.getByRole('button',{name:'Beneficiaries',exact:true}).click();await page.getByText('You’ve got it.',{exact:true}).waitFor();
@@ -111,9 +105,8 @@ const referenceResult=require('./fixtures/reference-result.json');
   await go('intake');await page.getByRole('button',{name:'Clear my details and conversation'}).click();
   assert.equal(await page.locator('.captured-row').count(),0);assert.equal(await page.locator('.message.customer').count(),0);
   assert.equal(await page.locator('input[type="checkbox"]').count(),0);
-  await go('welcome');await page.getByRole('button',{name:'Log in',exact:true}).click();await page.locator('#account-email').fill('jordan@example.test');await page.locator('#account-password').fill('Test-Password-123');await page.getByRole('button',{name:'Log in',exact:true}).click();await page.getByRole('heading',{name:'Welcome, Jordan',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Toggle navigation',exact:true}).click();await Promise.all([page.waitForEvent('load'),page.getByRole('button',{name:'End session',exact:true}).click()]);await page.waitForURL('**#landing');assert.equal(await page.evaluate(()=>sessionStorage.getItem('lifemap-auth')),null);
+  await go('home');await page.getByRole('button',{name:'Toggle navigation',exact:true}).click();await Promise.all([page.waitForEvent('load'),page.getByRole('button',{name:'End session',exact:true}).click()]);await page.waitForURL('**#landing');
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({confirmation:'passed',corrections:'passed',retry:'passed',privacy:'passed',context:'passed',personalizedCalculations:'passed',lessonQuiz:'passed',scenarioContext:'passed',calculationCalls,scenarioCalls,lessonCalls,welcomeAndGreeting:'passed',routes:'9 at desktop/tablet/mobile',intakeCalls,advisorCalls,errors},null,2));
+  console.log(JSON.stringify({confirmation:'passed',corrections:'passed',retry:'passed',privacy:'passed',context:'passed',personalizedCalculations:'passed',lessonQuiz:'passed',scenarioContext:'passed',calculationCalls,scenarioCalls,lessonCalls,accountFreeStart:'passed',routes:'9 at desktop/tablet/mobile',intakeCalls,advisorCalls,errors},null,2));
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -6,19 +6,16 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Include every root Python module: the API imports chat_features, learning,
-# calculator_bridge and auth_accounts, not just the original four files.
+# calculator_bridge, not just the original four files.
 COPY *.py ./
 COPY lifemap-ai-main ./lifemap-ai-main
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HOST=0.0.0.0 \
-    PORT=5173 \
-    LIFEMAP_AUTH_DB_PATH=/data/accounts.sqlite3
+    PORT=5173
 
-RUN useradd --create-home --uid 10001 lifemap \
-    && mkdir -p /data \
-    && chown lifemap:lifemap /data
+RUN useradd --create-home --uid 10001 lifemap
 
 USER lifemap
 EXPOSE 5173

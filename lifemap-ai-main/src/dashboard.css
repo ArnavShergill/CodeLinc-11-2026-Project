@@ -149,15 +149,6 @@
 .app-shell .ask-bar:focus-within,.app-shell #chat-form:focus-within {outline:2px solid #7898bb;outline-offset:2px;}
 .app-shell .ask-bar .send,.app-shell #chat-form .send {bottom:14px;}
 
-.account-card {max-width:480px;margin:0 auto;padding:30px;background:#fff;border:1px solid #d7e2ee;border-radius:18px;}
-.account-card form {display:flex;flex-direction:column;gap:12px;}
-.account-card label {font-size:14px;font-weight:600;color:#304e6c;}
-.account-card input {width:100%;padding:13px 14px;border:1px solid #cad8e7;border-radius:9px;font-size:16px;}
-.account-card .button {width:100%;margin:8px 0 20px;}
-.account-card p:empty {display:none;}
-.account-card>p {font-size:14px;}
-.account-card .quiet {font-size:12px;}
-.account-setup {padding:12px;background:#edf3fa;border-radius:8px;font-size:13px;}
 
 /* Keep the writing surface visually unified in the rose chat panel too. */
 .app-shell .page-learn .advisor .ask-bar textarea {background:transparent;}

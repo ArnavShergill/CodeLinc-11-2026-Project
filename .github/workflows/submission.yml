@@ -29,11 +29,11 @@ jobs:
       - name: Start the judge-facing website and API
         run: docker run -d --name lifemap-submission -p 5173:5173 lifemap-submission
       - name: Verify actual container endpoints
-        run: python scripts/smoke_submission.py http://127.0.0.1:5173 --account-file "$RUNNER_TEMP/lifemap-smoke-account.json"
-      - name: Verify API and accounts survive a restart
+        run: python scripts/smoke_submission.py http://127.0.0.1:5173
+      - name: Verify API survives a restart
         run: |
           docker restart lifemap-submission
-          python scripts/smoke_submission.py http://127.0.0.1:5173 --account-file "$RUNNER_TEMP/lifemap-smoke-account.json"
+          python scripts/smoke_submission.py http://127.0.0.1:5173
       - name: Container logs
         if: always()
         run: docker logs lifemap-submission

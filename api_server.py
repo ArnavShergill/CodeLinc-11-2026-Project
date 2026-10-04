@@ -29,7 +29,6 @@ MAX_MESSAGE_LENGTH = 2000
 _requests = {}
 _rate_lock = threading.Lock()
 _ai_slots = threading.BoundedSemaphore(4)
-_auth_slots = threading.BoundedSemaphore(2)
 
 
 def allow_request(client, now=None):
@@ -80,7 +79,7 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
-        if self.path not in ("/api/auth", "/api/chat", "/api/intake", "/api/calculate", "/api/scenario", "/api/lesson"):
+        if self.path not in ("/api/chat", "/api/intake", "/api/calculate", "/api/scenario", "/api/lesson"):
             self._send_json(404, {"error": "Endpoint not found."})
             return
 
@@ -102,22 +101,6 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
 
         if not isinstance(payload, dict):
             self._send_json(400, {"error": "Request body must be a JSON object."})
-            return
-        if self.path == '/api/auth':
-            from auth_accounts import AccountError, account_request
-            client = self.headers.get('X-Vercel-Forwarded-For', self.client_address[0]) if os.environ.get('VERCEL') else self.client_address[0]
-            if not allow_request('auth:' + client) or not _auth_slots.acquire(blocking=False):
-                self._send_json(429, {'error': 'Too many account requests. Please wait a minute and try again.'})
-                return
-            try:
-                result = account_request(payload, self.headers.get('Authorization'))
-                self._send_json(200, result)
-            except AccountError as error:
-                self._send_json(error.status, {'error': str(error)})
-            except Exception:
-                self._send_json(503, {'error': 'Accounts are temporarily unavailable. Please try again.'})
-            finally:
-                _auth_slots.release()
             return
         if self.path in ("/api/calculate", "/api/scenario", "/api/lesson"):
             client = self.client_address[0]

@@ -18,28 +18,28 @@ The submission code is not a repository secret to publish; enter it directly in 
 
 ## Fixes
 
-The Dockerfile now installs `requirements.txt`, copies every root Python module with `COPY *.py ./`, and runs `python app_server.py`. This includes `chat_features.py`, `learning.py`, `calculator_bridge.py`, and the account module. One process serves both the frontend and API, so a failed API import fails the server rather than leaving only a static page running. The server binds `0.0.0.0:5173` in Docker, provides `/api/health`, generates same-origin frontend endpoint URLs, and supports a `PORT` override.
+The Dockerfile now installs `requirements.txt`, copies every root Python module with `COPY *.py ./`, and runs `python app_server.py`. This includes `chat_features.py`, `learning.py`, `calculator_bridge.py`, and all other root runtime modules. One process serves both the frontend and API, so a failed API import fails the server rather than leaving only a static page running. The server binds `0.0.0.0:5173` in Docker, provides `/api/health`, generates same-origin frontend endpoint URLs, and supports a `PORT` override.
 
-The container runs as a non-root user. Account data lives in `/data`; mount a named volume if it needs to survive container replacement. `.env` files, credentials and local account databases are excluded from the Docker build context.
+The container runs as a non-root user. `.env` files, credentials and local account databases are excluded from the Docker build context.
 
 ## Exact build/run/check commands
 
 ```sh
 docker build --pull -t lifemap-submission -f Dockerfile .
 docker run -d --name lifemap-submission -p 5173:5173 lifemap-submission
-python3 scripts/smoke_submission.py http://127.0.0.1:5173 --account-file /tmp/lifemap-smoke-account.json
+python3 scripts/smoke_submission.py http://127.0.0.1:5173
 docker restart lifemap-submission
-python3 scripts/smoke_submission.py http://127.0.0.1:5173 --account-file /tmp/lifemap-smoke-account.json
+python3 scripts/smoke_submission.py http://127.0.0.1:5173
 docker logs lifemap-submission
 docker rm -f lifemap-submission
 ```
 
-The smoke account file contains a synthetic test identity only. Use a new fixture file for a new container without retained data. The smoke test checks the landing page and required assets, same-origin endpoints, API health, deterministic calculation, all five scenarios, greeting, percentage intake, real signup/login/logout and private-file protection. It sends no financial data to a model provider.
+The smoke test checks the landing page and required assets, same-origin endpoints, API health, deterministic calculation, all five scenarios, greeting, percentage intake, private-file protection. It sends no financial data to a model provider.
 
 The GitHub Actions **Verify Docker submission** workflow runs the actual Docker build and these smoke checks on Linux. Docker is not installed on the development Mac; a native smoke test alone is not presented as proof of a successful Docker build.
 
 ## Runtime configuration
 
-The image starts and deterministic calculations/accounts work without an API key. AI-generated lessons and natural-language extraction need a model service: pass `OLLAMA_API_KEY` at runtime for Ollama Cloud, or configure `LIFEMAP_OLLAMA_URL` and `LIFEMAP_OLLAMA_MODEL` for a running local Ollama server. The submission system must provide the AI key as an environment variable if live cloud AI is evaluated. Never commit the key or bake it into the image.
+The image starts and deterministic calculations work without an API key. AI-generated lessons and natural-language extraction need a model service: pass `OLLAMA_API_KEY` at runtime for Ollama Cloud, or configure `LIFEMAP_OLLAMA_URL` and `LIFEMAP_OLLAMA_MODEL` for a running local Ollama server. The submission system must provide the AI key as an environment variable if live cloud AI is evaluated. Never commit the key or bake it into the image.
 
-Vercel accounts still require a hosted Postgres `DATABASE_URL`; Docker uses SQLite unless a Postgres URL is supplied. Account identity persists in the database; financial plans remain in the browser tab. Official Lincoln integration and email verification/password recovery remain separate pending work. The financial formulas were not changed for this resubmission.
+Registration, login, and the account database have been removed. Financial plans remain in the browser tab. Official Lincoln integration remains pending. The financial formulas were not changed for this resubmission.

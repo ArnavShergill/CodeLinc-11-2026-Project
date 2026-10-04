@@ -1,9 +1,7 @@
 """Judge-style HTTP smoke test. Standard library only; synthetic data only."""
 import json
 from http.client import RemoteDisconnected
-from pathlib import Path
 import re
-import secrets
 import sys
 import time
 from urllib.error import HTTPError, URLError
@@ -22,7 +20,7 @@ def wait_for_health(probe, attempts=30):
             time.sleep(1)
 
 
-def verify(base, account_file=None):
+def verify(base):
     base = base.rstrip('/')
 
     def request(path, payload=None, token=None):
@@ -41,11 +39,12 @@ def verify(base, account_file=None):
     for asset in re.findall(r'(?:src|href)="([^"#]+)"', html):
         if not asset.startswith(('data:', 'http')):
             request('/' + asset)
-    for asset in ('src/services/authService.js', 'src/services/planService.js', 'src/types/contracts.js',
+    for asset in ('src/services/planService.js', 'src/types/contracts.js',
                   'src/data/mockProfile.js', 'src/assets/protection-illustration.svg'):
         request('/' + asset)
     config, _ = request('/config.js')
-    assert 'window.location.origin' in config and 'authApiUrl' in config
+    assert 'window.location.origin' in config and 'scenarioApiUrl' in config
+    assert 'authApiUrl' not in config
     assert 'lifemap-ai-live.vercel.app' not in config
     profile = {'annualIncome': 75000, 'spouseAnnualIncome': 45000, 'numberOfDependents': 3,
                'childrenAges': [7, 11], 'mortgageBalance': 180000, 'otherDebt': 25000, 'finalExpenses': 15000,
@@ -69,27 +68,12 @@ def verify(base, account_file=None):
     assert json.loads(body)['reply']
     body, _ = request('/api/intake', {'message': '2.5', 'field': 'inflationRate', 'context': {'profile': {}}})
     assert json.loads(body)['updates']['inflationRate'] == .025
-    fixture_path = Path(account_file) if account_file else None
-    if fixture_path and fixture_path.exists():
-        fixture = json.loads(fixture_path.read_text())
-        credentials, original_user = fixture['credentials'], fixture['user']
-    else:
-        email = 'smoke-' + secrets.token_hex(6) + '@example.test'
-        credentials = {'email': email, 'password': 'Synthetic-long-password-123'}
-        body, headers = request('/api/auth', {'action': 'register', 'fullName': 'Test Visitor', **credentials})
-        registered = json.loads(body)
-        original_user = registered['user']
-        assert headers['Cache-Control'] == 'no-store'
-        if fixture_path:
-            fixture_path.write_text(json.dumps({'credentials': credentials, 'user': original_user}))
-            fixture_path.chmod(0o600)
-        body, _ = request('/api/auth', {'action': 'logout'}, registered['access_token'])
-        assert json.loads(body)['ok']
-    body, _ = request('/api/auth', {'action': 'login', **credentials})
-    logged_in = json.loads(body)
-    assert logged_in['user'] == original_user
-    request('/api/auth', {'action': 'session'}, logged_in['access_token'])
-    request('/api/auth', {'action': 'logout'}, logged_in['access_token'])
+    try:
+        request('/api/auth', {'action': 'register'})
+        raise AssertionError('Removed account endpoint is still available')
+    except HTTPError as error:
+        assert error.code == 404
+        error.close()
     for path in ('/.env.local', '/.lifemap-data/accounts.sqlite3', '/src/../.env.local'):
         try:
             request(path)
@@ -97,13 +81,12 @@ def verify(base, account_file=None):
         except HTTPError as error:
             assert error.code == 404
             error.close()
-    print('PASS: landing/assets, same-origin config, API health, calculator, all five scenarios, chat greeting, percentage intake, real signup/login/logout, private-file protection.')
+    print('PASS: landing/assets, same-origin config, API health, calculator, all five scenarios, chat greeting, percentage intake, private-file protection.')
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('base', nargs='?', default='http://127.0.0.1:5173')
-    parser.add_argument('--account-file', help='Private synthetic fixture for checking restart persistence')
     arguments = parser.parse_args()
-    verify(arguments.base, arguments.account_file)
+    verify(arguments.base)

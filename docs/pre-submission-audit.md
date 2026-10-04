@@ -1,6 +1,6 @@
 # Pre-submission audit — October 4, 2026
 
-This is the audit snapshot before the subsequent real-account implementation. Account signup/login now works locally through LifeMap's own backend without Supabase. Hosted accounts still require Postgres and deployment; see `account-setup.md` for current status.
+Historical audit snapshot: account signup/login was subsequently implemented, then removed completely at the user’s request. The current application requires no account or database. The findings below describe the original audit, not the current account-free flow.
 
 Changes are local, not committed, pushed, or deployed. No interface redesign or calculation methodology change was made. Financial integration tests use synthetic profiles and stubbed model responses, with actual local Python calculation endpoints.
 
