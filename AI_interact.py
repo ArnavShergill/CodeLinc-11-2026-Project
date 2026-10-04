@@ -90,7 +90,7 @@ def get_demo_profile() -> Dict[str, Any]:
     return dict(DEMO_PROFILE, childrenAges=list(DEMO_PROFILE["childrenAges"]))
 
 def API_request(message: str, conversation: Optional[List[dict]] = None) -> str:
-    """Send a chat request to the local Ollama service and return its reply."""
+    """Send a chat request to the configured local or cloud Ollama service."""
     if not isinstance(message, str) or not message.strip():
         raise ValueError("A non-empty message is required.")
 
@@ -116,6 +116,10 @@ def API_request(message: str, conversation: Optional[List[dict]] = None) -> str:
     if not conversation or messages[-1].get("content") != message:
         messages.append({"role": "user", "content": message})
 
+    headers = {"Content-Type": "application/json"}
+    api_key = os.environ.get("OLLAMA_API_KEY")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     request = Request(
         OLLAMA_URL,
         data=json.dumps({
@@ -123,7 +127,7 @@ def API_request(message: str, conversation: Optional[List[dict]] = None) -> str:
             "messages": messages,
             "stream": False,
         }).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     try:
