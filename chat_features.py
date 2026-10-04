@@ -35,13 +35,54 @@ def clean_context(value):
     if not isinstance(value, dict):
         raise ValueError("Context must be an object.")
     result = {"profile": clean_profile(value.get("profile", {})), "resultSource": value.get("resultSource", "mock")}
+    result["profileSource"] = value.get("profileSource", "confirmed")
+    if result["profileSource"] not in ("example", "confirmed"):
+        raise ValueError("Invalid profile source.")
     if result["resultSource"] not in ("mock", "backend"):
         raise ValueError("Invalid result source.")
     calculation = value.get("result")
+    preferences = value.get("preferences", {})
+    if not isinstance(preferences, dict):
+        raise ValueError("Preferences must be an object.")
+    budget = preferences.get("monthlyBudget")
+    if budget is not None:
+        if isinstance(budget, bool) or not isinstance(budget, (int,float)) or not math.isfinite(budget) or budget < 0:
+            raise ValueError("Monthly budget must be a non-negative amount.")
+        result["preferences"] = {"monthlyBudget": budget}
+    learning = value.get("learning")
+    if learning is not None:
+        if not isinstance(learning,dict): raise ValueError("Invalid learning context.")
+        result["learning"] = {}
+        for key in ("topic", "title", "explanation", "question", "why"):
+            text = learning.get(key)
+            if text is not None:
+                if not isinstance(text,str) or len(text)>3000: raise ValueError("Invalid learning text.")
+                result["learning"][key] = text
+    simulation = value.get("simulation")
+    if simulation is not None:
+        if not isinstance(simulation,dict): raise ValueError("Invalid simulation context.")
+        result["simulation"] = {"changes":clean_profile(simulation.get("changes",{}))}
+        for key in ("policyYears","proposedCoverage"):
+            item=simulation.get(key)
+            if isinstance(item,bool) or not isinstance(item,(int,float)) or not math.isfinite(item) or item<0: raise ValueError("Invalid simulation number.")
+            result["simulation"][key]=item
+        points=simulation.get("timeline",[])
+        if not isinstance(points,list) or len(points)>10: raise ValueError("Invalid timeline.")
+        result["simulation"]["timeline"] = []
+        for point in points:
+            if not isinstance(point,dict): raise ValueError("Invalid timeline point.")
+            clean={}
+            for key in ("year","additionalNeed","proposedCoverage","remainingGap"):
+                item=point.get(key)
+                if isinstance(item,bool) or not isinstance(item,(int,float)) or not math.isfinite(item) or item<0: raise ValueError("Invalid timeline amount.")
+                clean[key]=item
+            result["simulation"]["timeline"].append(clean)
     if calculation is not None:
         if not isinstance(calculation, dict):
             raise ValueError("Result must be an object.")
         result["result"] = {}
+        if calculation.get("calculator") == "team-reference":
+            result["result"]["calculator"] = "team-reference"
         for key in ("immediateNeeds", "longTermNeeds", "totalNeeds", "availableResources", "additionalCoverageNeeded"):
             item = calculation.get(key)
             if isinstance(item, bool) or not isinstance(item, (int, float)) or not math.isfinite(item) or item < 0:
@@ -66,10 +107,11 @@ def capture_intake(message, profile, field):
     if field is not None and field not in FIELDS:
         raise ValueError("Unknown intake field.")
     prompt = (
-        "Extract only facts explicitly stated in the user's latest message. Return a JSON object of "
-        "changed LifeNeedsProfile fields only. Never calculate coverage or infer facts. "
+        "Extract only facts explicitly stated in the user's latest message. Return ONLY a JSON object with "
+        "updates (an object of changed LifeNeedsProfile fields) and help (a short plain-language explanation if the user asks a question or is unsure). "
+        "For a question, updates must be empty; explain the current concept calmly and ask one focused question. Never calculate coverage or infer facts. "
         "Use null or omit unknown fields. A bare numeric answer refers to the current question field. "
-        "If a message is a question or ambiguous, return {}. Convert explicitly stated monthly income "
+        "If a message is a question or ambiguous, leave updates empty. Convert explicitly stated monthly income "
         "to annual income, k to thousands, and percentages to fractional rates. No negative values. "
         "Children's ages must be an array of integers. Corrections replace previous field values. "
         "Saying no mortgage means mortgageBalance=0; no children means childrenAges=[]; "
@@ -83,9 +125,12 @@ def capture_intake(message, profile, field):
         raw = raw.strip()
         if raw.startswith("```"):
             raw = re.sub(r"\A```(?:json)?\s*|\s*```\Z", "", raw)
-        updates = clean_profile(json.loads(raw))
+        parsed = json.loads(raw)
+        updates = clean_profile(parsed.get("updates", parsed) if isinstance(parsed,dict) else parsed)
     except (ValueError, TypeError) as error:
         raise RuntimeError("I couldn't confidently read those details. Please rephrase your answer.") from error
     if not updates:
-        return {"updates": {}, "reply": "I haven't changed your information. Please answer the current question with an amount or number, or edit your details in Review."}
+        help_text = parsed.get("help", "")
+        if not isinstance(help_text,str) or len(help_text)>1000: help_text=""
+        return {"updates": {}, "reply": help_text or "I haven't changed your information. Please answer the current question with an amount or number, or edit your details in Review."}
     return {"updates": updates, "reply": "Please confirm the details below before I add them to your plan."}

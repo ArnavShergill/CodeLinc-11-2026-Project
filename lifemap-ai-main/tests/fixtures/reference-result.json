@@ -1,0 +1,37 @@
+{
+  "immediateNeeds": 220000.0,
+  "longTermNeeds": 520375.55,
+  "totalNeeds": 740375.55,
+  "availableResources": 150000.0,
+  "additionalCoverageNeeded": 590375.55,
+  "breakdown": [
+    {
+      "label": "Mortgage",
+      "amount": 180000.0
+    },
+    {
+      "label": "Other debt",
+      "amount": 25000.0
+    },
+    {
+      "label": "Final expenses",
+      "amount": 15000.0
+    },
+    {
+      "label": "Income support",
+      "amount": 440375.55
+    },
+    {
+      "label": "Education goals",
+      "amount": 80000.0
+    }
+  ],
+  "assumptions": [
+    "Calculated from your confirmed inputs by the team reference calculator; this is not Lincoln\u2019s proprietary calculator or a policy quote.",
+    "Income support lasts 10 years at $50,000 per year before the calculator's inflation/return adjustment.",
+    "Inflation assumption: 2.0%; investment return assumption: 5.0%. These are assumptions, not promised returns.",
+    "Existing insurance and available assets are counted separately from the additional coverage estimate.",
+    "Annual salary and dependent count are context; this calculator uses your explicitly chosen income-support and education amounts rather than deriving them from salary or family size."
+  ],
+  "calculator": "team-reference"
+}

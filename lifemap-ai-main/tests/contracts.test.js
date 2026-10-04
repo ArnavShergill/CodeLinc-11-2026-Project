@@ -40,6 +40,6 @@ test('configured calculator and scenario adapters pass profile and changes to ba
  globalThis.window={location:{hostname:'arnavshergill.github.io'},LIFEMAP_CONFIG:{chatApiUrl:'https://api.example.com/api/chat',calculateApiUrl:'https://api.example.com/api/calculate',scenarioApiUrl:'https://api.example.com/api/scenario'}};
  try{
   const service=await import('../src/services/planService.js?backend-test');
-  await withFetch(async(url,options)=>{const body=JSON.parse(options.body);assert.deepEqual(body.profile,mockProfile);if(url.endsWith('/scenario'))assert.deepEqual(body.changes,{mortgageBalance:250000});return {ok:true,json:async()=>({result:mockResult})};},async()=>{assert.equal((await service.calculatePlan(mockProfile)).source,'backend');assert.equal((await service.calculateScenario(mockProfile,'home',{mortgageBalance:250000})).source,'backend');});
+  await withFetch(async(url,options)=>{const body=JSON.parse(options.body);assert.deepEqual(body.profile,mockProfile);if(url.endsWith('/scenario'))assert.deepEqual(body.changes,{mortgageBalance:250000});return {ok:true,json:async()=>({result:mockResult,timeline:[0,5,10,15,20].map(year=>({year,additionalNeed:650000,proposedCoverage:650000,remainingGap:0}))})};},async()=>{assert.equal((await service.calculatePlan(mockProfile)).source,'backend');assert.equal((await service.calculateScenario(mockProfile,'home',{mortgageBalance:250000})).source,'backend');});
  }finally{delete globalThis.window;}
 });

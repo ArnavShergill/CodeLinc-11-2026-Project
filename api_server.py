@@ -9,6 +9,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from AI_interact import API_request
 from chat_features import capture_intake, clean_context
+from calculator_bridge import calculate, simulate
+from learning import make_lesson
 
 
 ALLOWED_ORIGINS = {
@@ -75,7 +77,7 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
-        if self.path not in ("/api/chat", "/api/intake"):
+        if self.path not in ("/api/chat", "/api/intake", "/api/calculate", "/api/scenario", "/api/lesson"):
             self._send_json(404, {"error": "Endpoint not found."})
             return
 
@@ -97,6 +99,30 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
 
         if not isinstance(payload, dict):
             self._send_json(400, {"error": "Request body must be a JSON object."})
+            return
+        if self.path in ("/api/calculate", "/api/scenario", "/api/lesson"):
+            client = self.client_address[0]
+            if not allow_request(client):
+                self._send_json(429, {"error": "Please wait a minute before trying again."})
+                return
+            try:
+                if self.path == "/api/calculate":
+                    result = {"result": calculate(payload.get("profile", {}))}
+                elif self.path == "/api/scenario":
+                    result = simulate(payload.get("profile", {}), payload.get("scenario"), payload.get("changes"), payload.get("proposedCoverage"), payload.get("policyYears"))
+                else:
+                    if not _ai_slots.acquire(blocking=False):
+                        self._send_json(429, {"error": "The tutor is busy. Please retry in a moment."})
+                        return
+                    try:
+                        result = {"lesson": make_lesson(payload.get("topic"), payload.get("context", {}))}
+                    finally:
+                        _ai_slots.release()
+                self._send_json(200, result)
+            except ValueError as error:
+                self._send_json(400, {"error": str(error)})
+            except Exception:
+                self._send_json(502, {"error": "We couldn't prepare this step. Please retry."})
             return
         message = payload.get("message")
         conversation = payload.get("conversation", [])

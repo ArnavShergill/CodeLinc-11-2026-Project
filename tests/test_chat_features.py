@@ -76,4 +76,51 @@ class ChatTests(unittest.TestCase):
             self.assertEqual(status,502)
             self.assertNotIn('secret-provider-details',str(payload))
 
+
+class ConnectedFlowTests(unittest.TestCase):
+    def profile(self):
+        return dict(annualIncome=75000,spouseAnnualIncome=45000,numberOfDependents=3,childrenAges=[7,11],mortgageBalance=180000,otherDebt=25000,finalExpenses=15000,desiredAnnualIncome=50000,incomeReplacementYears=10,collegeFundingNeed=80000,existingLifeInsurance=100000,availableAssets=50000,inflationRate=.02,investmentReturnRate=.05)
+
+    def test_existing_reference_calculator_is_used_and_inputs_change_the_result(self):
+        from calculator_bridge import calculate
+        profile=self.profile();base=calculate(profile)
+        self.assertEqual(base['calculator'],'team-reference')
+        self.assertEqual(base['additionalCoverageNeeded'],590375.55)
+        changed=calculate({**profile,'mortgageBalance':250000})
+        self.assertEqual(changed['additionalCoverageNeeded']-base['additionalCoverageNeeded'],70000)
+        self.assertEqual(profile['mortgageBalance'],180000)
+        self.assertEqual(calculate({**profile,'existingLifeInsurance':2000000})['additionalCoverageNeeded'],0)
+
+    def test_projection_uses_same_plan_and_explicit_policy_expiry(self):
+        from calculator_bridge import simulate
+        projection=simulate(self.profile(),proposed_coverage=300000,policy_years=10)
+        self.assertEqual(projection['timeline'][0]['additionalNeed'],590375.55)
+        self.assertEqual(projection['timeline'][0]['remainingGap'],290375.55)
+        self.assertEqual(projection['timeline'][2]['proposedCoverage'],0)
+        self.assertEqual(projection['timeline'][2]['additionalNeed'],150000)
+        self.assertTrue(any('remain unchanged' in item for item in projection['assumptions']))
+
+    def test_scenarios_only_apply_selected_fields(self):
+        from calculator_bridge import simulate
+        projection=simulate(self.profile(),'home',{'mortgageBalance':250000})
+        self.assertEqual(projection['result']['additionalCoverageNeeded'],660375.55)
+        self.assertEqual(projection['baseResult']['additionalCoverageNeeded'],590375.55)
+        with self.assertRaises(ValueError): simulate(self.profile(),'home',{'existingLifeInsurance':1000000})
+
+    def test_lessons_are_generated_with_confirmed_context_and_validated(self):
+        from learning import make_lesson
+        lesson={'title':'Who life insurance helps','explanation':'A payable death benefit can support beneficiaries.','example':'Your dependents may use it for financial responsibilities.','question':'Who receives a payable death benefit?','choices':['Beneficiaries','The bank automatically','Everyone who starts a policy'],'correctIndex':0,'why':'Beneficiaries receive the payable benefit under policy terms.'}
+        with patch('learning._chat',return_value=json.dumps(lesson)) as model:
+            output=make_lesson('protection',{'profile':self.profile(),'resultSource':'backend'})
+            self.assertEqual(output['correctIndex'],0)
+            self.assertIn('75000',model.call_args.args[0][1]['content'])
+        with patch('learning._chat',return_value='{"choices":[],"correctIndex":10}'):
+            with self.assertRaises(RuntimeError): make_lesson('protection',{})
+
+    def test_intake_can_teach_without_inventing_a_value(self):
+        with patch('chat_features._chat',return_value='{"updates":{},"help":"Annual income means what you earn in a year before taxes. What amount would you like to record?"}'):
+            result=capture_intake('What does annual income mean?',{},'annualIncome')
+            self.assertEqual(result['updates'],{})
+            self.assertIn('before taxes',result['reply'])
+
 if __name__=='__main__': unittest.main()

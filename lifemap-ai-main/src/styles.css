@@ -16,3 +16,28 @@
 #scenario-form {display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:24px;margin:20px 0;}
 #scenario-form h3,#scenario-form p {flex-basis:100%;}
 @media (prefers-reduced-motion:reduce) {.typing span {animation:none;}}
+
+.learning-path {max-width:1000px;margin:auto;}
+.lesson-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:24px 0;}
+.lesson-card {display:flex;flex-direction:column;gap:10px;text-align:left;padding:18px;border:1px solid #cadbdd;border-radius:14px;background:#fff;cursor:pointer;}
+.lesson-card.selected,.quiz-choice.selected {border-color:#0866f5;background:#eef5ff;}
+.lesson-card small,.lesson-card span {font-size:13px;color:#4b626a;}
+.lesson-content {padding:28px;line-height:1.65;}
+.lesson-text {white-space:pre-line;}
+.quiz-choice {display:block;width:100%;padding:14px;text-align:left;margin:10px 0;border:1px solid #cadbdd;background:#fff;border-radius:10px;cursor:pointer;}
+.lesson-actions,.learning-next {display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:24px 0;}
+.learning-next p {flex-basis:100%;}
+.protection-controls {display:flex;flex-wrap:wrap;gap:16px;padding:24px;margin-bottom:24px;}
+.protection-controls h3,.protection-controls p {flex-basis:100%;}
+.protection-controls label,#scenario-form label {display:flex;flex-direction:column;gap:8px;flex:1;min-width:180px;}
+.protection-controls input,#scenario-form input,#monthly-budget {padding:12px;border:1px solid #b9ced2;border-radius:8px;max-width:100%;}
+.budget-label {display:block;margin-top:20px;margin-bottom:10px;}
+.projection-table {max-width:100%;overflow-x:auto;margin:24px 0;}
+.projection-table table {width:100%;border-collapse:collapse;background:#fff;}
+.projection-table caption {text-align:left;font-weight:600;padding:12px 0;}
+.projection-table th,.projection-table td {text-align:left;padding:12px;border-bottom:1px solid #dce6e7;white-space:nowrap;}
+.chart-legend {display:flex;flex-wrap:wrap;gap:16px;justify-content:center;font-size:13px;}
+.chart-legend span:first-child {color:#0866f5;}
+.chart-legend span:last-child {color:#a15d19;}
+.situation-summary {padding:16px;background:#edf4f1;border-radius:12px;line-height:1.6;}
+@media(max-width:600px){.lesson-content{padding:18px;}.lesson-grid{grid-template-columns:1fr;}.protection-controls label,#scenario-form label{min-width:100%;}.result-actions{flex-wrap:wrap;}}

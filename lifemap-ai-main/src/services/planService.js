@@ -60,10 +60,18 @@ export async function calculatePlan(profile){
  if(config.calculateApiUrl){const payload=await post(config.calculateApiUrl,{profile});return {result:validateResult(payload.result),source:'backend'};}
  return {result:structuredClone(mockResult),source:'mock'};
 }
-export async function calculateScenario(profile,scenario,changes){
+export async function calculateScenario(profile,scenario,changes,options={}){
  if(!config.scenarioApiUrl)throw Error('Live scenarios are waiting for the calculator integration.');
- const payload=await post(config.scenarioApiUrl,{profile,scenario,changes});
- return {result:validateResult(payload.result),source:'backend'};
+ const payload=await post(config.scenarioApiUrl,{profile,scenario,changes,...options});
+ validateResult(payload.result);
+ if(!Array.isArray(payload.timeline)||payload.timeline.length!==5||payload.timeline.some(point=>['year','additionalNeed','proposedCoverage','remainingGap'].some(key=>typeof point[key]!=='number'||!Number.isFinite(point[key])||point[key]<0)))throw Error('The simulator returned an invalid timeline.');
+ return {...payload,result:payload.result,source:'backend'};
+}
+export async function generateLesson(topic,context={}){
+ const payload=await post(new URL('lesson',chatUrl).href,{topic,context});
+ const lesson=payload.lesson;
+ if(!lesson||['title','explanation','example','question','why'].some(key=>typeof lesson[key]!=='string')||!Array.isArray(lesson.choices)||lesson.choices.length!==3||lesson.choices.some(choice=>typeof choice!=='string')||!Number.isInteger(lesson.correctIndex)||lesson.correctIndex<0||lesson.correctIndex>2)throw Error('The tutor returned an invalid lesson. Please retry.');
+ return lesson;
 }
 export async function explainPlan(result,profile,source='mock'){
  if(source==='mock')return 'This is a fixed sample result used to preview the experience. It is not calculated from your information. Your team is connecting the Lincoln calculators; your personal estimate will be available after that integration.';

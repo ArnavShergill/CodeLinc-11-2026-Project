@@ -2,13 +2,15 @@
 
 [Shared website](https://arnavshergill.github.io/CodeLinc-11-2026-Project/) · [Vercel website and AI backend](https://lifemap-ai-live.vercel.app)
 
-LifeMap collects confirmed planning details through conversational intake and provides contextual educational answers. Calculation and scenario screens remain explicitly labeled samples until the backend team's Lincoln calculator integration is connected. No competing calculator formula is implemented in the frontend or chat layer.
+LifeMap collects confirmed planning details through conversational intake and provides contextual educational answers. Planning and scenario screens use the existing team reference calculator in `back_end.py`, adapted by `calculator_bridge.py`. They respond to confirmed inputs. This is not Lincoln’s proprietary calculator; the teammate’s Lincoln integration can replace the calculator at that boundary. No competing insurance-needs formula is implemented in the frontend or AI layer.
 
 ## What works
 
 - Profiles start empty. Intake extracts stated facts, including multiple fields and corrections, and proposes them for explicit confirmation before saving.
+- AI-generated mini-lessons cover protection, needs, term/permanent tradeoffs, future changes, and next steps. Each includes an example, a comprehension check, and personalized follow-up with the tutor. Users can learn before sharing details and switch into planning at any time.
+- The simulator starts with the calculated profile and reruns the same calculator for explicit life-event changes. It models proposed additional coverage over a chosen duration, compares remaining need, and lists assumptions. It does not treat a death benefit as income received when coverage starts.
 - All 14 fields in the existing shared contract are supported. Missing fields are asked one at a time. Review allows manual corrections; a complete synthetic sample is available as a separate shortcut.
-- Ask LifeMap receives the confirmed profile, recent conversation, calculator result, and its source. Fixed sample numbers are identified as examples and never represented as personal calculations.
+- Ask LifeMap receives the confirmed profile, recent conversation, calculator result, and its source. The team reference calculator is identified accurately, and an example profile is labeled when used.
 - Requests have a timeout, duplicate-send protection, progress indicators, and retry without adding the same message twice.
 - A short informational notice explains AI processing; chat sends immediately without a checkbox. Clear my details removes the in-tab profile and conversation. Reload also resets the session. No localStorage or account persistence is used.
 - Server validation limits message length, conversation size, profile values, and request-body size. Provider errors and visitor addresses are excluded from application logs. Per-instance limits allow up to 20 requests per minute per client and four concurrent model requests. Distributed rate limiting is not provided by this in-memory guard; configure a hosting-edge rule before relying on a global limit.
@@ -35,6 +37,9 @@ Endpoints:
 
 - `POST /api/chat`: `{message, conversation, context: {profile, result?, resultSource}}` → `{reply}`.
 - `POST /api/intake`: same body plus `field` (a contract field or null) → `{updates, reply}`. These updates are proposals; the browser commits them only after confirmation.
+- `POST /api/calculate`: `{profile}` → `{result}` from the team reference calculator.
+- `POST /api/scenario`: `{profile, scenario?, changes?, proposedCoverage?, policyYears?}` → calculator result, baseline, explicit changes, five timeline points and assumptions.
+- `POST /api/lesson`: `{topic, context}` → a validated AI-generated lesson with a comprehension question.
 - `GET /api/health`: server liveness only, not model readiness.
 
 The GitHub Pages origin and local preview origins are allowed. Add other origins through comma-separated `LIFEMAP_ALLOWED_ORIGINS`. `PORT` or `LIFEMAP_API_PORT` controls the local bridge port.
@@ -43,7 +48,7 @@ The GitHub Pages origin and local preview origins are allowed. Add other origins
 
 Keep the existing `back_end.py` and the team's Lincoln calculator work as the calculation owner. The frontend does not change their formulas or select a Lincoln calculator.
 
-Set public browser configuration values when the endpoints are ready:
+The checked-in browser configuration now points to the live team-reference endpoints. Override these URLs when the Lincoln integration is ready:
 
 ```js
 window.LIFEMAP_CONFIG = {
@@ -57,7 +62,7 @@ window.LIFEMAP_CONFIG = {
 
 `LifeNeedsResult` uses finite non-negative numbers for `immediateNeeds`, `longTermNeeds`, `totalNeeds`, `availableResources`, and `additionalCoverageNeeded`, plus `breakdown: [{label, amount}]` and `assumptions: string[]`. The breakdown convention still needs agreement with the backend owner. Map the Lincoln response at that API boundary rather than making AI infer financial numbers.
 
-With `calculateApiUrl` configured, the review screen calls that endpoint, validates the response, and marks it `backend`. AI explanations then use those exact calculator numbers. With `scenarioApiUrl` configured, the simulator exposes explicit scenario inputs and displays the returned result. Until configured, calculations and timelines remain fixed samples. The Vercel build keeps extra configuration keys while replacing only `chatApiUrl` with its same-origin URL.
+With `calculateApiUrl` configured, the review screen calls that endpoint, validates the response, and marks it `backend`. AI explanations then use those exact calculator numbers. With `scenarioApiUrl` configured, the simulator exposes explicit scenario inputs and displays the returned result. The current `calculator_bridge.py` maps the team reference output to this contract without altering `back_end.py`. Its future view reruns that calculator with fewer remaining income-support years, holds other amounts constant unless changed explicitly, and models the proposed additional coverage as zero after the chosen duration. It does not model premium pricing, underwriting, cash value, investment growth, or actual products. The Vercel build keeps extra configuration keys while replacing only `chatApiUrl` with its same-origin URL.
 
 ## Verification
 
@@ -74,4 +79,4 @@ Browser QA requires Playwright and Chrome:
 PLAYWRIGHT_MODULE_PATH=/path/to/playwright QA_STATIC_ROOT="$PWD/lifemap-ai-main" node lifemap-ai-main/tests/browser-check.cjs
 ```
 
-This serves local assets at the Pages origin and mocks model responses to check confirmation, correction, retry, privacy, context, sample labels, clearing, and all eight routes at desktop/tablet/mobile widths. It does not replace a live deployment smoke test.
+This serves local assets at the Pages origin and mocks API responses to check lessons, quizzes, confirmation, correction, retry, privacy, context, calculator input changes, scenario context, clearing, and all eight routes at desktop/tablet/mobile widths. It does not replace a live deployment smoke test.

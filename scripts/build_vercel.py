@@ -9,4 +9,8 @@ shutil.copytree(source, output, dirs_exist_ok=True, ignore=shutil.ignore_pattern
 (output / "config.js").write_text(
     (source / "config.js").read_text()
     + "\nwindow.LIFEMAP_CONFIG.chatApiUrl = window.location.origin + '/api/chat';\n"
+    + "for (const [key, route] of [['calculateApiUrl', 'calculate'], ['scenarioApiUrl', 'scenario']]) {\n"
+    + "  if (window.LIFEMAP_CONFIG[key] === 'https://lifemap-ai-live.vercel.app/api/' + route) {\n"
+    + "    window.LIFEMAP_CONFIG[key] = window.location.origin + '/api/' + route;\n"
+    + "  }\n}\n"
 )
