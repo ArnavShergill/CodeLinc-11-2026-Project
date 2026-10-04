@@ -14,22 +14,19 @@ const assert=require('assert/strict');
   });
   let failNext=false,intakeCalls=0,advisorCalls=0,lastAdvisor;
   await page.route('**/api/intake',async route=>{
-   intakeCalls++;const body=route.request().postDataJSON();assert.equal(body.consent,true);
+   intakeCalls++;const body=route.request().postDataJSON();
    if(failNext){failNext=false;return route.fulfill({status:502,json:{error:'Unavailable'}});}
    const updates=body.message.includes('correction')?{annualIncome:95000}:body.field==='annualIncome'?{annualIncome:90000,numberOfDependents:2}:{spouseAnnualIncome:45000};
    return route.fulfill({json:{reply:'Please confirm these details.',updates}});
   });
   await page.route('**/api/chat',async route=>{
-   advisorCalls++;lastAdvisor=route.request().postDataJSON();assert.equal(lastAdvisor.consent,true);
+   advisorCalls++;lastAdvisor=route.request().postDataJSON();
    return route.fulfill({json:{reply:'Your confirmed annual income is '+lastAdvisor.context.profile.annualIncome+'. Calculations are still examples.'}});
   });
   await page.goto(process.env.QA_BASE_URL||(process.env.QA_STATIC_ROOT?'https://arnavshergill.github.io/CodeLinc-11-2026-Project/':'http://127.0.0.1:5173'));
   const go=async route=>{await page.evaluate(r=>location.hash=r,route);await page.waitForTimeout(150);};
   await go('intake');
   await page.locator('#message').fill('I earn 90k and support two people');
-  await page.getByRole('button',{name:'Send message'}).click();
-  await page.getByRole('alert').filter({hasText:'privacy'}).waitFor();assert.equal(intakeCalls,0);
-  await page.locator('[data-action="consent"]').check();
   await page.getByRole('button',{name:'Send message'}).click();
   await page.getByRole('button',{name:'Confirm details'}).waitFor();
   assert.equal(await page.locator('.captured-row').count(),0);
@@ -66,7 +63,7 @@ const assert=require('assert/strict');
   }
   await go('intake');await page.getByRole('button',{name:'Clear my details and conversation'}).click();
   assert.equal(await page.locator('.captured-row').count(),0);assert.equal(await page.locator('.message.customer').count(),0);
-  assert.equal(await page.locator('[data-action="consent"]').isChecked(),false);
+  assert.equal(await page.locator('input[type="checkbox"]').count(),0);
   assert.deepEqual(errors,[]);
   console.log(JSON.stringify({confirmation:'passed',corrections:'passed',retry:'passed',privacy:'passed',context:'passed',sampleLabels:'passed',routes:'8 at desktop/tablet/mobile',intakeCalls,advisorCalls,errors},null,2));
  }finally{await browser.close();}

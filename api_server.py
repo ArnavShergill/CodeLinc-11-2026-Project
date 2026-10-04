@@ -109,9 +109,6 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
         ):
             self._send_json(400, {"error": "Invalid conversation history."})
             return
-        if payload.get("consent") is not True:
-            self._send_json(400, {"error": "Please accept the chat privacy notice before sending."})
-            return
         client = self.headers.get("X-Vercel-Forwarded-For", self.client_address[0]) if os.environ.get("VERCEL") else self.client_address[0]
         if not allow_request(client) or not _ai_slots.acquire(blocking=False):
             self._send_json(429, {"error": "Too many requests. Please wait a minute and try again."})

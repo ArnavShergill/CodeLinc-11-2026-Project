@@ -34,18 +34,17 @@ async function post(url,body){
 }
 function requestBody(message,conversation,context){
  if(typeof message!=='string'||!message.trim()||message.length>2000)throw Error('Please send between 1 and 2,000 characters.');
- if(!context.consent)throw Error('Please accept the chat privacy notice before sending.');
- const {consent,...details}=context;
- return {message,consent:true,context:details,conversation:conversation.slice(-20).map(turn=>({role:turn.role==='customer'?'user':turn.role,content:turn.text}))};
+ const details=context;
+ return {message,context:details,conversation:conversation.slice(-20).map(turn=>({role:turn.role==='customer'?'user':turn.role,content:turn.text}))};
 }
 export async function askLifeMap(message,conversation=[],context={}){
  const payload=await post(chatUrl,requestBody(message,conversation,context));
  if(typeof payload.reply!=='string'||!payload.reply.trim())throw Error('The AI returned an empty answer. Please retry.');
  return payload.reply;
 }
-export async function sendIntakeMessage({profile,questionIndex,message,conversation=[],consent=false}){
+export async function sendIntakeMessage({profile,questionIndex,message,conversation=[]}){
  const field=intakeQuestions[questionIndex]?.[0]||null;
- const payload=await post(intakeUrl,{...requestBody(message,conversation,{profile,consent}),field});
+ const payload=await post(intakeUrl,{...requestBody(message,conversation,{profile}),field});
  if(typeof payload.reply!=='string')throw Error('The AI returned an invalid answer. Please retry.');
  return {updates:validUpdates(payload.updates),reply:payload.reply};
 }
@@ -66,7 +65,7 @@ export async function calculateScenario(profile,scenario,changes){
  const payload=await post(config.scenarioApiUrl,{profile,scenario,changes});
  return {result:validateResult(payload.result),source:'backend'};
 }
-export async function explainPlan(result,profile,source='mock',consent=false){
+export async function explainPlan(result,profile,source='mock'){
  if(source==='mock')return 'This is a fixed sample result used to preview the experience. It is not calculated from your information. Your team is connecting the Lincoln calculators; your personal estimate will be available after that integration.';
- return askLifeMap('Explain the provided calculator result in plain language. Use its numbers exactly and describe the main contributors. Do not recalculate anything.',[],{profile,result,resultSource:source,consent});
+ return askLifeMap('Explain the provided calculator result in plain language. Use its numbers exactly and describe the main contributors. Do not recalculate anything.',[],{profile,result,resultSource:source});
 }

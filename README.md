@@ -10,7 +10,7 @@ LifeMap collects confirmed planning details through conversational intake and pr
 - All 14 fields in the existing shared contract are supported. Missing fields are asked one at a time. Review allows manual corrections; a complete synthetic sample is available as a separate shortcut.
 - Ask LifeMap receives the confirmed profile, recent conversation, calculator result, and its source. Fixed sample numbers are identified as examples and never represented as personal calculations.
 - Requests have a timeout, duplicate-send protection, progress indicators, and retry without adding the same message twice.
-- A privacy notice requires agreement before messages are sent to AI. Clear my details removes the in-tab profile and conversation. Reload also resets the session. No localStorage or account persistence is used.
+- A short informational notice explains AI processing; chat sends immediately without a checkbox. Clear my details removes the in-tab profile and conversation. Reload also resets the session. No localStorage or account persistence is used.
 - Server validation limits message length, conversation size, profile values, and request-body size. Provider errors and visitor addresses are excluded from application logs. Per-instance limits allow up to 20 requests per minute per client and four concurrent model requests. Distributed rate limiting is not provided by this in-memory guard; configure a hosting-edge rule before relying on a global limit.
 
 ## Local development
@@ -33,7 +33,7 @@ The Vercel deployment currently uses `Amos-Isaya/lifemap-ai-live`, a separate re
 
 Endpoints:
 
-- `POST /api/chat`: `{message, conversation, consent: true, context: {profile, result?, resultSource}}` → `{reply}`.
+- `POST /api/chat`: `{message, conversation, context: {profile, result?, resultSource}}` → `{reply}`.
 - `POST /api/intake`: same body plus `field` (a contract field or null) → `{updates, reply}`. These updates are proposals; the browser commits them only after confirmation.
 - `GET /api/health`: server liveness only, not model readiness.
 
@@ -66,7 +66,7 @@ npm test
 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Frontend tests cover empty profiles, proposed extraction, invalid-value rejection, context/history/consent, retry errors, fixture boundaries, and calculator/scenario adapters. Python tests cover extraction validation, source context, HTTP request validation, privacy consent, burst limits, and sanitized failures.
+Frontend tests cover empty profiles, proposed extraction, invalid-value rejection, context/history, retry errors, fixture boundaries, and calculator/scenario adapters. Python tests cover extraction validation, source context, HTTP request validation, burst limits, and sanitized failures.
 
 Browser QA requires Playwright and Chrome:
 

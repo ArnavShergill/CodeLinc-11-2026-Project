@@ -60,13 +60,14 @@ class ChatTests(unittest.TestCase):
         handler.do_POST()
         return output[0]
 
-    def test_http_rejects_no_consent_bad_origin_and_oversized_messages(self):
-        self.assertEqual(self.request({'message':'hello'})[0],400)
-        self.assertEqual(self.request({'message':'hello','consent':True},origin='https://evil.example')[0],403)
-        self.assertEqual(self.request({'message':'x'*2001,'consent':True})[0],400)
+    def test_http_accepts_chat_without_checkbox_and_rejects_invalid_requests(self):
+        with patch('api_server.API_request',return_value='Hello'):
+            self.assertEqual(self.request({'message':'hello'})[0],200)
+        self.assertEqual(self.request({'message':'hello'},origin='https://evil.example')[0],403)
+        self.assertEqual(self.request({'message':'x'*2001})[0],400)
 
     def test_http_passes_context_and_hides_provider_errors(self):
-        body={'message':'hello','consent':True,'context':{'profile':{'annualIncome':90000}}}
+        body={'message':'hello','context':{'profile':{'annualIncome':90000}}}
         with patch('api_server.API_request',return_value='Answer') as model:
             self.assertEqual(self.request(body),(200,{'reply':'Answer'}))
             self.assertEqual(model.call_args.args[2]['profile'],{'annualIncome':90000})

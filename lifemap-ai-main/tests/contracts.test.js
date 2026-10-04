@@ -14,18 +14,18 @@ test('intake sends confirmed context and returns proposed facts without mutating
  const profile=emptyProfile();
  await withFetch(async(url,options)=>{
   assert.equal(url,'http://127.0.0.1:8000/api/intake');const body=JSON.parse(options.body);
-  assert.equal(body.field,'annualIncome');assert.equal(body.consent,true);assert.deepEqual(body.context.profile,profile);
+  assert.equal(body.field,'annualIncome');assert.deepEqual(body.context.profile,profile);
   return {ok:true,json:async()=>({reply:'Please confirm.',updates:{annualIncome:90000,numberOfDependents:2}})};
- },async()=>{const response=await sendIntakeMessage({profile,questionIndex:0,message:'I earn 90k and have two dependents',consent:true});assert.deepEqual(response.updates,{annualIncome:90000,numberOfDependents:2});assert.equal(profile.annualIncome,null);});
+ },async()=>{const response=await sendIntakeMessage({profile,questionIndex:0,message:'I earn 90k and have two dependents'});assert.deepEqual(response.updates,{annualIncome:90000,numberOfDependents:2});assert.equal(profile.annualIncome,null);});
 });
 test('invalid extracted values are rejected rather than committed',async()=>{
  for(const updates of [{annualIncome:-1},{numberOfDependents:1.5},{inflationRate:2},{childrenAges:[999]}]){
-  await withFetch(async()=>({ok:true,json:async()=>({reply:'Confirm',updates})}),async()=>{await assert.rejects(sendIntakeMessage({profile:emptyProfile(),questionIndex:0,message:'hello',consent:true}),/invalid details/);});
+  await withFetch(async()=>({ok:true,json:async()=>({reply:'Confirm',updates})}),async()=>{await assert.rejects(sendIntakeMessage({profile:emptyProfile(),questionIndex:0,message:'hello'}),/invalid details/);});
  }
 });
-test('chat sends recent history and confirmed calculator context with explicit consent',async()=>{
- await withFetch(async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.conversation.length,20);assert.equal(body.conversation[0].role,'user');assert.equal(body.context.resultSource,'mock');assert.deepEqual(body.context.result,mockResult);return {ok:true,json:async()=>({reply:'This is a sample result.'})};},async()=>{assert.match(await askLifeMap('Why?',Array.from({length:30},()=>({role:'customer',text:'hello'})),{profile:mockProfile,result:mockResult,resultSource:'mock',consent:true}),/sample/);});
- await assert.rejects(askLifeMap('hello'),/privacy notice/);await assert.rejects(askLifeMap('a'.repeat(2001),[],{consent:true}),/2,000/);
+test('chat sends recent history and confirmed calculator context without a checkbox gate',async()=>{
+ await withFetch(async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.conversation.length,20);assert.equal(body.conversation[0].role,'user');assert.equal(body.context.resultSource,'mock');assert.deepEqual(body.context.result,mockResult);return {ok:true,json:async()=>({reply:'This is a sample result.'})};},async()=>{assert.match(await askLifeMap('Why?',Array.from({length:30},()=>({role:'customer',text:'hello'})),{profile:mockProfile,result:mockResult,resultSource:'mock'}),/sample/);});
+ await assert.rejects(askLifeMap('a'.repeat(2001),[],{consent:true}),/2,000/);
 });
 test('connection and rate-limit failures surface for retry instead of impersonating live AI',async()=>{
  await withFetch(async()=>{throw new TypeError('fetch failed');},async()=>{await assert.rejects(askLifeMap('Hello',[],{consent:true}),/message is saved/);});
