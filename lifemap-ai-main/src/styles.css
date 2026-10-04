@@ -55,7 +55,7 @@
 .lesson-content,.lesson-card,.quiz-choice {overflow-wrap:anywhere;}
 
 /* A quiet reading space for the lessons. */
-.page-learn {--blue:#526144;--muted:#595b52;--border:#d9d9cf;color:#30372d;}
+.page-learn {--blue:#655285;--muted:#595b52;--border:#d9d9cf;color:#30372d;}
 .page-learn .learning-path {max-width:760px;}
 .page-learn .learning-path h1 {font-size:28px;font-weight:600;letter-spacing:-.02em;}
 .page-learn .learning-path>p {font-size:16px;max-width:65ch;}
@@ -64,7 +64,7 @@
 .page-learn .lesson-card strong {font-size:16px;font-weight:600;line-height:1.4;color:#30372d;}
 .page-learn .lesson-card span {display:none;}
 .page-learn .lesson-card small {color:#626558;font-size:13px;}
-.page-learn .lesson-card.selected {background:#edf0e7;border-color:#526144;box-shadow:inset 3px 0 #526144;}
+.page-learn .lesson-card.selected {background:#f0ebf7;border-color:#655285;box-shadow:inset 3px 0 #655285;}
 .page-learn .lesson-content,.page-learn .empty-state {background:#fffefb;border:1px solid #deded5;border-radius:6px;box-shadow:none;padding:32px;}
 .page-learn .lesson-content h2 {font-size:25px;font-weight:600;color:#30372d;}
 .page-learn .lesson-content h3 {font-size:18px;letter-spacing:0;margin-top:28px;color:#30372d;}
@@ -72,13 +72,22 @@
 .page-learn .knowledge-check {margin-top:28px;padding-top:4px;border-top:1px solid #deded5;}
 .page-learn .quiz-choice {border-color:#d9d9cf;border-radius:5px;background:#fffefb;color:#30372d;font-size:16px;line-height:1.5;padding:14px 16px;}
 .page-learn .quiz-choice:hover {background:#f5f5ef;}
-.page-learn .quiz-choice.selected {border-color:#526144;background:#edf0e7;}
-.page-learn .primary,.page-learn .send {background:#526144;box-shadow:none;}
-.page-learn .primary:hover,.page-learn .send:hover {background:#3f4d33;}
-.page-learn .secondary {border-color:#d9d9cf;color:#435338;box-shadow:none;}
-.page-learn .secondary:hover {background:#edf0e7;}
+.page-learn .quiz-choice.selected {border-color:#655285;background:#f0ebf7;}
+.page-learn .primary,.page-learn .send {background:#655285;box-shadow:none;}
+.page-learn .primary:hover,.page-learn .send:hover {background:#51406d;}
+.page-learn .secondary {border-color:#d9d9cf;color:#5c477c;box-shadow:none;}
+.page-learn .secondary:hover {background:#f0ebf7;}
 .page-learn .tabs button {color:#50554a;}
-.page-learn .tabs button[aria-pressed=true] {color:#435338;border-color:#526144;background:#edf0e7;}
-.page-learn button:focus-visible,.page-learn a:focus-visible {outline-color:#788864;}
+.page-learn .tabs button[aria-pressed=true] {color:#5c477c;border-color:#655285;background:#f0ebf7;}
+.page-learn button:focus-visible,.page-learn a:focus-visible {outline-color:#9a85b8;}
 .page-learn .lesson-actions {padding-top:20px;border-top:1px solid #deded5;gap:10px;}
 @media(max-width:600px){.page-learn .lesson-grid{grid-template-columns:1fr;}.page-learn .lesson-content,.page-learn .empty-state{padding:20px;}.page-learn .lesson-content p{font-size:16px;}.page-learn .lesson-actions .button{width:100%;}}
+
+/* Learning comes first, with a soft plum accent. */
+.welcome-card.basics {background:#f0ebf7;border:1px solid #d8cce7;}
+.welcome-card.basics .feature-icon {background:#e3d8f0;color:#655285;}
+.welcome-card.basics .primary {background:#655285;box-shadow:none;}
+.welcome-card.basics .primary:hover {background:#51406d;}
+.welcome-card.build {background:#f7f8f6;border:1px solid #e0e4dd;}
+.welcome-card.build .feature-icon {background:#e9eeeb;color:#4f6760;}
+.welcome-card.build .secondary {background:#fff;color:#405951;border-color:#cbd7d1;box-shadow:none;}
