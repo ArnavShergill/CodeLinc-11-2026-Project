@@ -1,9 +1,7 @@
-import AI_interact
-import back_end
-import front_end
+import front_end as fe
 
 def main():
-    pass
+    fe.front_end()
 
 if __name__ == "__main__":
     try:
