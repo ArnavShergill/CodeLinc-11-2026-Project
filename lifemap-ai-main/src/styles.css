@@ -53,3 +53,32 @@
 .start-choice small {font-size:15px;color:#4b626a;}
 .welcome-start .button {margin-right:12px;}
 .lesson-content,.lesson-card,.quiz-choice {overflow-wrap:anywhere;}
+
+/* A quiet reading space for the lessons. */
+.page-learn {--blue:#526144;--muted:#595b52;--border:#d9d9cf;color:#30372d;}
+.page-learn .learning-path {max-width:760px;}
+.page-learn .learning-path h1 {font-size:28px;font-weight:600;letter-spacing:-.02em;}
+.page-learn .learning-path>p {font-size:16px;max-width:65ch;}
+.page-learn .lesson-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:24px 0 32px;}
+.page-learn .lesson-card {background:#faf9f5;border-color:#deded5;border-radius:6px;padding:16px 18px;gap:6px;box-shadow:none;}
+.page-learn .lesson-card strong {font-size:16px;font-weight:600;line-height:1.4;color:#30372d;}
+.page-learn .lesson-card span {display:none;}
+.page-learn .lesson-card small {color:#626558;font-size:13px;}
+.page-learn .lesson-card.selected {background:#edf0e7;border-color:#526144;box-shadow:inset 3px 0 #526144;}
+.page-learn .lesson-content,.page-learn .empty-state {background:#fffefb;border:1px solid #deded5;border-radius:6px;box-shadow:none;padding:32px;}
+.page-learn .lesson-content h2 {font-size:25px;font-weight:600;color:#30372d;}
+.page-learn .lesson-content h3 {font-size:18px;letter-spacing:0;margin-top:28px;color:#30372d;}
+.page-learn .lesson-content p {font-size:17px;line-height:1.8;color:#50554a;max-width:65ch;}
+.page-learn .knowledge-check {margin-top:28px;padding-top:4px;border-top:1px solid #deded5;}
+.page-learn .quiz-choice {border-color:#d9d9cf;border-radius:5px;background:#fffefb;color:#30372d;font-size:16px;line-height:1.5;padding:14px 16px;}
+.page-learn .quiz-choice:hover {background:#f5f5ef;}
+.page-learn .quiz-choice.selected {border-color:#526144;background:#edf0e7;}
+.page-learn .primary,.page-learn .send {background:#526144;box-shadow:none;}
+.page-learn .primary:hover,.page-learn .send:hover {background:#3f4d33;}
+.page-learn .secondary {border-color:#d9d9cf;color:#435338;box-shadow:none;}
+.page-learn .secondary:hover {background:#edf0e7;}
+.page-learn .tabs button {color:#50554a;}
+.page-learn .tabs button[aria-pressed=true] {color:#435338;border-color:#526144;background:#edf0e7;}
+.page-learn button:focus-visible,.page-learn a:focus-visible {outline-color:#788864;}
+.page-learn .lesson-actions {padding-top:20px;border-top:1px solid #deded5;gap:10px;}
+@media(max-width:600px){.page-learn .lesson-grid{grid-template-columns:1fr;}.page-learn .lesson-content,.page-learn .empty-state{padding:20px;}.page-learn .lesson-content p{font-size:16px;}.page-learn .lesson-actions .button{width:100%;}}
