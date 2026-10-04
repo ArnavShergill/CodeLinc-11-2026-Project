@@ -1,6 +1,7 @@
 """Local HTTP bridge from the LifeMap browser app to AI_interact."""
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from AI_interact import API_request
@@ -87,8 +88,9 @@ class LifeMapAPIHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", 8000), LifeMapAPIHandler)
-    print("LifeMap API listening at http://127.0.0.1:8000")
+    host = os.environ.get("LIFEMAP_API_HOST", "127.0.0.1")
+    server = ThreadingHTTPServer((host, 8000), LifeMapAPIHandler)
+    print(f"LifeMap API listening at http://{host}:8000")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

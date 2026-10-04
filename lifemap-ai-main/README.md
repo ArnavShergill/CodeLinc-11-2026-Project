@@ -18,6 +18,24 @@ npm run api
 
 Then open http://127.0.0.1:5173. If using VS Code Live Server instead, it may serve the frontend on port 5500; the API still listens separately on `127.0.0.1:8000`, and allows requests from both frontend ports. Port 5500 cannot also be used by the API while Live Server is using it. The API health endpoint is http://127.0.0.1:8000/api/health. Ollama must be running locally with `gemma3:latest` available (`ollama pull gemma3`). Requires Python 3, Pydantic, the Ollama service, and npm; no npm install is needed. `LIFEMAP_OLLAMA_MODEL` and `LIFEMAP_OLLAMA_URL` can override the model service defaults. Inter from Google Fonts is optional; local sans-serif fonts provide a fallback.
 
+### Docker
+
+Build the container from the repository root:
+
+```sh
+docker build -t lifemap-ai .
+```
+
+The container runs the root `npm run api` script and serves `index.html` over HTTP on port 5173. Run it with port publishing:
+
+```sh
+docker run --rm -p 5173:5173 -p 8000:8000 lifemap-ai
+```
+
+Then open http://127.0.0.1:5173 in your browser. The chat API is available at http://127.0.0.1:8000/api/health. Ollama must be running on the host with the configured model available; the container defaults to `http://host.docker.internal:11434/api/chat`. If needed, override it with `LIFEMAP_OLLAMA_URL`. On Linux, add `--add-host=host.docker.internal:host-gateway` to `docker run`.
+
+The API listens on all container interfaces so Docker's published port can reach it; outside Docker it defaults to `127.0.0.1`.
+
 ## Click through
 
 Get started → Start my plan → send four replies (or Use example) → Review my information → edit any fields → Calculate my plan → See full breakdown → Try a life scenario → choose a milestone. Use the sidebar for Home, My Plan, Future Simulator, Coverage Breakdown, and Ask LifeMap. My Plan is selected during intake and review. Mobile navigation opens with the menu button.
