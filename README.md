@@ -18,7 +18,9 @@ Eight-screen LifeMap customer demo with a unified deep teal, warm ivory and blue
 
 ### Deploy the AI API to Vercel
 
-Import this GitHub repository into Vercel. Keep the **Root Directory** at the repository root and choose **Other** as the framework. The checked-in `vercel.json` publishes the Python functions at `/api/chat` and `/api/health`; the frontend remains on GitHub Pages.
+**Simplified setup:** [Deploy LifeMap to Vercel](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FArnavShergill%2FCodeLinc-11-2026-Project&env=OLLAMA_API_KEY&envLink=https%3A%2F%2Follama.com%2Fsettings%2Fkeys&project-name=lifemap-ai&repository-name=lifemap-ai). Sign in and enter your Ollama API key when prompted. Vercel builds the website and backend together, automatically connects chat to `/api/chat`, and defaults to Ollama Cloud with `gemma4:31b`. No additional environment variables or frontend URL edits are required. The model and Ollama URL variables below are optional overrides for this setup.
+
+Import this GitHub repository into Vercel. Keep the **Root Directory** at the repository root and choose **Other** as the framework. The checked-in `vercel.json` publishes the website and Python functions at `/api/chat` and `/api/health`. The separate GitHub Pages deployment continues to use its own configuration.
 
 For Ollama Cloud, create an API key at https://ollama.com/settings/keys and add these Vercel environment variables:
 

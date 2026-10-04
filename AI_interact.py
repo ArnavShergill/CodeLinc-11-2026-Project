@@ -15,9 +15,10 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
-OLLAMA_MODEL = os.environ.get("LIFEMAP_OLLAMA_MODEL", "gemma3:latest")
+IS_VERCEL = os.environ.get("VERCEL") == "1"
+OLLAMA_MODEL = os.environ.get("LIFEMAP_OLLAMA_MODEL", "gemma4:31b" if IS_VERCEL else "gemma3:latest")
 OLLAMA_URL = os.environ.get(
-    "LIFEMAP_OLLAMA_URL", "http://127.0.0.1:11434/api/chat"
+    "LIFEMAP_OLLAMA_URL", "https://ollama.com/api/chat" if IS_VERCEL else "http://127.0.0.1:11434/api/chat"
 )
 
 # 1. Define the shared data contract verbatim from the workflow document
