@@ -3,55 +3,67 @@ import assert from 'node:assert/strict';
 import {mockProfile} from '../src/data/mockProfile.js';
 import {mockResult} from '../src/data/mockResult.js';
 import {validateProfile} from '../src/types/contracts.js';
-import {askLifeMap,calculatePlan,sendIntakeMessage} from '../src/services/planService.js';
-test('contract fixture is complete and invalid values are rejected',()=>{assert.deepEqual(validateProfile(mockProfile),[]);for(const annualIncome of [undefined,NaN,-1])assert.ok(validateProfile({...mockProfile,annualIncome}).includes('Annual income'));assert.ok(validateProfile({...mockProfile,childrenAges:[NaN]}).length);});
-test('profile edits cannot silently alter the mock coverage result',async()=>{const response=await calculatePlan({...mockProfile,annualIncome:123456});assert.equal(response.source,'mock');assert.deepEqual(response.result,mockResult);response.result.breakdown.pop();assert.equal(mockResult.breakdown.length,5);});
-test('intake calls the Python AI bridge while keeping profile values synthetic',async()=>{
- const originalFetch=globalThis.fetch;
- let request;
- globalThis.fetch=async(url,options)=>{
-  request={url,options};
-  return {ok:true,json:async()=>({reply:'Thanks for sharing that.'})};
- };
- try{
-  const response=await sendIntakeMessage({
-   profile:mockProfile,
-   questionIndex:0,
-   message:'I earn $9 million',
-   conversation:[{role:'customer',text:'I earn $9 million'}]
-  });
-  assert.equal(request.url,'http://127.0.0.1:8000/api/chat');
-  assert.equal(JSON.parse(request.options.body).conversation[0].role,'user');
-  assert.equal(response.reply,'Thanks for sharing that.');
-  assert.equal(response.profile.annualIncome,75000);
-  assert.equal(response.source,'live-ai');
-  assert.equal(response.profileSource,'mock');
- }finally{
-  globalThis.fetch=originalFetch;
+import {askLifeMap,calculatePlan,sendIntakeMessage,emptyProfile,nextQuestionIndex,validateResult} from '../src/services/planService.js';
+async function withFetch(fake,work){const original=globalThis.fetch;globalThis.fetch=fake;try{return await work();}finally{globalThis.fetch=original;}}
+test('new profiles contain no invented customer facts and missing details stay missing',()=>{
+ const profile=emptyProfile();assert.ok(Object.values(profile).every(value=>value===null));assert.equal(nextQuestionIndex(profile),0);
+ assert.equal(nextQuestionIndex({...profile,annualIncome:90000}),1);assert.equal(nextQuestionIndex(mockProfile),-1);
+ assert.ok(validateProfile({...mockProfile,childrenAges:[NaN]}).length);
+});
+test('intake sends confirmed context and returns proposed facts without mutating the profile',async()=>{
+ const profile=emptyProfile();
+ await withFetch(async(url,options)=>{
+  assert.equal(url,'http://127.0.0.1:8000/api/intake');const body=JSON.parse(options.body);
+  assert.equal(body.field,'annualIncome');assert.deepEqual(body.context.profile,profile);
+  return {ok:true,json:async()=>({reply:'Please confirm.',updates:{annualIncome:90000,numberOfDependents:2}})};
+ },async()=>{const response=await sendIntakeMessage({profile,questionIndex:0,message:'I earn 90k and have two dependents'});assert.deepEqual(response.updates,{annualIncome:90000,numberOfDependents:2});assert.equal(profile.annualIncome,null);});
+});
+test('invalid extracted values are rejected rather than committed',async()=>{
+ for(const updates of [{annualIncome:-1},{numberOfDependents:1.5},{inflationRate:2},{childrenAges:[999]}]){
+  await withFetch(async()=>({ok:true,json:async()=>({reply:'Confirm',updates})}),async()=>{await assert.rejects(sendIntakeMessage({profile:emptyProfile(),questionIndex:0,message:'hello'}),/invalid details/);});
  }
 });
-test('AI bridge errors fall back to a demo reply when Ollama is unavailable',async()=>{
- const originalFetch=globalThis.fetch;
- globalThis.fetch=async()=>({
-  ok:false,
-  status:502,
-  json:async()=>({error:'Could not reach Ollama at http://127.0.0.1:11434/api/chat. Start Ollama and ensure the model gemma3:latest is available.'})
+test('chat sends recent history and confirmed calculator context without a checkbox gate',async()=>{
+ await withFetch(async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.conversation.length,20);assert.equal(body.conversation[0].role,'user');assert.equal(body.context.resultSource,'mock');assert.deepEqual(body.context.result,mockResult);return {ok:true,json:async()=>({reply:'This is a sample result.'})};},async()=>{assert.match(await askLifeMap('Why?',Array.from({length:30},()=>({role:'customer',text:'hello'})),{profile:mockProfile,result:mockResult,resultSource:'mock'}),/sample/);});
+ await assert.rejects(askLifeMap('a'.repeat(2001),[],{consent:true}),/2,000/);
+});
+test('connection and rate-limit failures surface for retry instead of impersonating live AI',async()=>{
+ await withFetch(async()=>{throw new TypeError('fetch failed');},async()=>{await assert.rejects(askLifeMap('Hello',[],{consent:true}),/message is saved/);});
+ await withFetch(async()=>({ok:false,status:429,json:async()=>({})}),async()=>{await assert.rejects(askLifeMap('Hello',[],{consent:true}),/wait a minute/);});
+});
+test('sample calculations stay explicit and cannot change the shared fixture',async()=>{
+ const response=await calculatePlan({...mockProfile,annualIncome:123456});assert.equal(response.source,'mock');assert.deepEqual(response.result,mockResult);response.result.breakdown.pop();assert.equal(mockResult.breakdown.length,5);
+ await assert.rejects(calculatePlan({...mockProfile,mortgageBalance:-1}),/Mortgage balance/);
+ assert.throws(()=>validateResult({...mockResult,additionalCoverageNeeded:NaN}),/invalid result/);
+});
+test('configured calculator and scenario adapters pass profile and changes to backend-owned math',async()=>{
+ globalThis.window={location:{hostname:'arnavshergill.github.io'},LIFEMAP_CONFIG:{chatApiUrl:'https://api.example.com/api/chat',calculateApiUrl:'https://api.example.com/api/calculate',scenarioApiUrl:'https://api.example.com/api/scenario'}};
+ try{
+  const service=await import('../src/services/planService.js?backend-test');
+  await withFetch(async(url,options)=>{const body=JSON.parse(options.body);assert.deepEqual(body.profile,mockProfile);if(url.endsWith('/scenario'))assert.deepEqual(body.changes,{mortgageBalance:250000});return {ok:true,json:async()=>({result:mockResult,timeline:[0,5,10,15,20].map(year=>({year,additionalNeed:650000,proposedCoverage:650000,remainingGap:0}))})};},async()=>{assert.equal((await service.calculatePlan(mockProfile)).source,'backend');assert.equal((await service.calculateScenario(mockProfile,'home',{mortgageBalance:250000})).source,'backend');});
+ }finally{delete globalThis.window;}
+});
+
+test('chat carries assessment profile and calculator state into the next turn',async()=>{
+ let context={profile:{mortgageBalance:100000},assessment:{active:true}};
+ await withFetch(async(url,options)=>{
+  const body=JSON.parse(options.body);assert.deepEqual(body.context,context);
+  return {ok:true,json:async()=>({reply:'How much other debt should be included?',profile:{mortgageBalance:100000,existingLifeInsurance:50000},assessment:{active:true,field:'otherDebt'},mode:'assessment'})};
+ },async()=>{
+  const reply=await askLifeMap('I already have 50k coverage',[],context,response=>{context={profile:response.profile,assessment:response.assessment};});
+  assert.match(reply,/other debt/);assert.equal(context.profile.mortgageBalance,100000);assert.equal(context.profile.existingLifeInsurance,50000);
  });
- try{
-  const reply=await askLifeMap('What is life insurance?');
-  assert.match(reply,/demo mode|gemma3:latest|sample profile/i);
- }finally{
-  globalThis.fetch=originalFetch;
- }
+ await withFetch(async(url,options)=>{
+  const body=JSON.parse(options.body);assert.equal(body.context.profile.existingLifeInsurance,50000);
+  return {ok:true,json:async()=>({reply:'The backend calculated your needs.',profile:mockProfile,assessment:{active:true,field:null},mode:'complete',result:mockResult})};
+ },async()=>{let calculation;await askLifeMap('Here are the remaining details',[],context,response=>{calculation=response.result;});assert.deepEqual(calculation,mockResult);});
 });
-test('unavailable Python API falls back to the demo assistant',async()=>{
- const originalFetch=globalThis.fetch;
- globalThis.fetch=async()=>{throw new TypeError('fetch failed');};
- try{
-  const reply=await askLifeMap('Hello');
-  assert.match(reply,/demo mode|local Ollama service/i);
- }finally{
-  globalThis.fetch=originalFetch;
- }
+
+test('calculator required fields match backend and omitted optional assumptions remain omitted',async()=>{
+ const required={mortgageBalance:180000,otherDebt:25000,finalExpenses:15000,desiredAnnualIncome:50000,incomeReplacementYears:10,collegeFundingNeed:80000,existingLifeInsurance:100000,availableAssets:50000};
+ assert.deepEqual(validateProfile(required),[]);
+ assert.deepEqual(validateProfile({...required,inflationRate:null,investmentReturnRate:null}),[]);
+ assert.ok(validateProfile({...required,availableAssets:null}).length);
+ assert.ok(validateProfile({...required,inflationRate:NaN}).length);
+ assert.ok(validateProfile({...required,incomeReplacementYears:121}).length);
 });
-test('invalid profile is rejected by adapter',async()=>{await assert.rejects(calculatePlan({...mockProfile,mortgageBalance:-10}),/Mortgage balance/)});

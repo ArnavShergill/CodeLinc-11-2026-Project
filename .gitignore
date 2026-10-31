@@ -1,0 +1,15 @@
+/public/
+__pycache__/
+*.pyc
+.vercel/
+.env
+.env.*
+.venv/
+.aws/
+credentials*.json
+service-account*.json
+*.key
+*.pem
+.lifemap-data/
+*.sqlite3
+*.sqlite3-*
