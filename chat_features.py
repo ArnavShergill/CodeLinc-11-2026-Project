@@ -116,6 +116,29 @@ def clean_context(value):
     return result
 
 
+def direct_intake_value(message, field):
+    """Parse a single explicit answer locally; never infer missing facts."""
+    answer = message.strip().lower().rstrip('.!')
+    if field == "childrenAges":
+        if answer in ("none", "no", "no children", "no kids", "0"):
+            return {field: []}
+        if re.fullmatch(r"\d+(?:\s*,\s*\d+)*", answer):
+            return clean_profile({field: [int(age.strip()) for age in answer.split(',')]})
+        return {}
+    if field not in FIELDS or field in RATES:
+        return {}
+    if answer in ("none", "zero", "no", "nothing", "n/a", "not applicable", "no mortgage", "no debt", "no insurance", "no assets"):
+        return {field: 0}
+    words = {"one":1,"two":2,"three":3,"four":4,"five":5,"six":6,"seven":7,"eight":8,"nine":9,"ten":10,"twenty":20}
+    for word, value in words.items():
+        answer = re.sub(r"\b" + word + r"\b", str(value), answer)
+    match = re.fullmatch(r"(?:about |around |approximately |roughly )?\$?(\d[\d,]*(?:\.\d+)?)\s*(k|thousand|m|million)?\s*(years?|dollars?|per year)?", answer)
+    if not match or (match[3] and match[3].startswith('year') and field != 'incomeReplacementYears'):
+        return {}
+    value = float(match[1].replace(',', '')) * {None:1,'k':1000,'thousand':1000,'m':1000000,'million':1000000}[match[2]]
+    return clean_profile({field: value})
+
+
 def capture_intake(message, profile, field):
     profile = clean_profile(profile)
     if field is not None and field not in FIELDS:
@@ -127,6 +150,9 @@ def capture_intake(message, profile, field):
         return {"updates": {}, "reply": str(error)}
     if field in RATE_FIELDS:
         return {"updates": rate_updates, "reply": "Please confirm the details below before I add them to your plan."}
+    direct = direct_intake_value(message, field)
+    if direct:
+        return {"updates": direct, "reply": "Please confirm the details below before I add them to your plan."}
     prompt = (
         "Extract only facts explicitly stated in the user's latest message. Return ONLY a JSON object with "
         "updates (an object of changed LifeNeedsProfile fields) and help (a short plain-language explanation if the user asks a question or is unsure). "
@@ -140,7 +166,7 @@ def capture_intake(message, profile, field):
     )
     raw = _chat([
         {"role": "system", "content": prompt},
-        {"role": "user", "content": json.dumps({"currentField": field, "confirmedProfile": profile, "latestMessage": message})},
+        {"role": "user", "content": json.dumps({"currentField": field, "latestMessage": message})},
     ], json_mode=True)
     try:
         raw = raw.strip()

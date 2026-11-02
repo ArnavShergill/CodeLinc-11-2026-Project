@@ -9,7 +9,15 @@ const intakeUrl=chatUrl?new URL('intake',chatUrl).href:'';
 export const calculatorConnected=Boolean(config.calculateApiUrl);
 export const scenarioConnected=Boolean(config.scenarioApiUrl);
 export const emptyProfile=()=>Object.fromEntries(intakeQuestions.map(([key])=>[key,null]));
-export function nextQuestionIndex(profile){return intakeQuestions.findIndex(([key])=>profile[key]==null);}
+export function nextQuestionIndex(profile){
+ const first= intakeQuestions.findIndex(([key])=>profile[key]==null);
+ if(profile.numberOfDependents!=null){
+  const priorities=profile.numberOfDependents>0?['childrenAges','desiredAnnualIncome','incomeReplacementYears','collegeFundingNeed']:['mortgageBalance','otherDebt','existingLifeInsurance'];
+  const next=priorities.find(key=>profile[key]==null);
+  if(next)return intakeQuestions.findIndex(([key])=>key===next);
+ }
+ return first;
+}
 function validUpdates(updates){
  if(!updates||typeof updates!=='object'||Array.isArray(updates))throw Error('The AI returned invalid profile details.');
  const valid={};

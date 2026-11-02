@@ -67,3 +67,12 @@ test('calculator required fields match backend and omitted optional assumptions 
  assert.ok(validateProfile({...required,inflationRate:NaN}).length);
  assert.ok(validateProfile({...required,incomeReplacementYears:121}).length);
 });
+
+
+test('dependents change question priorities without discarding facts',()=>{
+ const family={...emptyProfile(),annualIncome:75000,numberOfDependents:2};
+ const single={...family,numberOfDependents:0};
+ assert.equal(nextQuestionIndex(family),3);
+ assert.equal(nextQuestionIndex(single),4);
+ assert.equal(family.annualIncome,75000);
+});

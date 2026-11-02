@@ -106,3 +106,7 @@ This serves local assets at the Pages origin and mocks API responses to check le
 ## Pre-submission audit
 
 See [the audit report](docs/pre-submission-audit.md) for formula traces, confirmed bugs, verification commands, and unresolved submission risks. Run the offline real-calculator browser audit with `AUDIT_PYTHON=/path/to/python PLAYWRIGHT_MODULE_PATH=/path/to/playwright node lifemap-ai-main/tests/audit-browser.cjs`. It starts an isolated Python HTTP server, uses synthetic profiles, and stubs only model generation. `python scripts/audit_secrets.py` checks the current local key against tracked files, built output, and reachable Git history without printing it.
+
+
+### Submission reliability updates
+Straightforward intake answers (amounts, counts, years, child ages and rates) are parsed locally before any model request. The next question prioritizes family-support details when dependents are present and debts/existing cover otherwise; all facts remain reviewable. After the profile is complete, intake asks an optional comfortable monthly payment, which informs discussion only and never changes the deterministic formula. Prepared lessons are explicitly identified when live tutoring fails. Lesson-generated numeric claims are rejected in favor of prepared educational content. Complex natural-language extraction and live tutoring still require an available model; no model availability is claimed in offline mode. Docker builds require the Python base image and dependency packages to be available to the build environment.

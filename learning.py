@@ -13,6 +13,25 @@ LESSONS = {
 }
 
 
+def offline_lesson(topic, context):
+    """An explicitly labelled, curated lesson when live tutoring is unavailable."""
+    title, brief = LESSONS[topic]
+    profile = context.get('profile', {})
+    example = 'A family may use a payable death benefit to help meet financial responsibilities.'
+    if profile.get('numberOfDependents', 0) > 0:
+        example = 'Because people depend on your income, consider how long they would need support and which expenses matter most.'
+    elif profile.get('mortgageBalance', 0) > 0:
+        example = 'Your mortgage is a responsibility to review when comparing a defined coverage period with longer-lasting coverage.'
+    if context.get('preferences', {}).get('monthlyBudget') is not None:
+        example += ' Compare coverage duration with a payment you can comfortably maintain; this tool does not quote premiums.'
+    return {'topic':topic, 'title':title, 'explanation':brief,
+        'example':example, 'question':'What is the best way to use this lesson?',
+        'choices':['Review your responsibilities and policy terms','Treat it as a guaranteed quote','Assume every policy is the same'],
+        'correctIndex':0, 'why':'Use confirmed details and review policy terms. This is education, not financial advice or a quote.',
+        'sourceUrl':'https://www.lincolnfinancial.com/public/individuals/products/lifeinsurance',
+        'mode':'offline', 'notice':'Live AI tutoring is unavailable. This is a prepared educational lesson.'}
+
+
 def make_lesson(topic, context):
     if topic not in LESSONS: raise ValueError('Unknown lesson.')
     title, grounding = LESSONS[topic]
@@ -27,7 +46,12 @@ def make_lesson(topic, context):
         'The answer must follow directly from the lesson. Make choices unambiguous. '
         'Teaching brief: ' + grounding
     )
-    raw = _chat([{'role':'system','content':prompt}, {'role':'user','content':json.dumps({'topic':title,'confirmedContext':context})}], json_mode=True).strip()
+    try:
+        raw = _chat([{'role':'system','content':prompt}, {'role':'user','content':json.dumps({'topic':title,'confirmedContext':context})}], json_mode=True).strip()
+    except Exception:
+        lesson = offline_lesson(topic, context)
+        lesson['explanation'] = lesson['notice'] + ' ' + lesson['explanation']
+        return lesson
     if raw.startswith('```'): raw = re.sub(r'\A```(?:json)?\s*|\s*```\Z','',raw)
     try:
         lesson = json.loads(raw)
@@ -39,5 +63,9 @@ def make_lesson(topic, context):
         if isinstance(correct,bool) or not isinstance(correct,int) or not 0<=correct<3: raise ValueError()
     except (ValueError,TypeError) as error:
         raise RuntimeError('The lesson could not be generated. Please retry.') from error
+    from AI_interact import _qualitative_only
+    texts = [lesson[key] for key in ('title','explanation','example','question','why')] + lesson['choices']
+    if any(not _qualitative_only(text) for text in texts):
+        return offline_lesson(topic, context)
     return {**{key:lesson[key] for key in ('title','explanation','example','question','choices','correctIndex','why')}, 'topic':topic,
             'sourceUrl':'https://www.lincolnfinancial.com/public/individuals/products/lifeinsurance'}
